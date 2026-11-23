@@ -1422,7 +1422,7 @@ const BZ_SUBJ = { E:['ENGLISH'], U:['URDU'], IE:['ISLAMIYAT', 'ISLAMIAT'], MQH:[
   BIO:['BOTANY', 'ZOOLOGY', 'BIOLOGY'], M:['MATHEMATICS', 'MATHS', 'MATH'], CS:['COMPUTER SCIENCE', 'COMPUTER'], ETHN:['ETHICS'], PC:['PAKISTANI CULTURE', 'PAKISTAN CULTURE'],
   ECO:['ECONOMICS'], EA:['ENGLISH ADVANCE', 'ENGLISH ADVANCED', 'ENGLISH ELECTIVE'], SG:['SOCIOLOGY'], GEO:['GEOGRAPHY'], PSY:['PSYCHOLOGY'], PHIL:['LOGIC', 'PHILOSOPHY'],
   IH:['HISTORY', 'ISLAMIC HISTORY'], IS:['ISLAMIYAT ELECTIVE', 'ISLAMIAT ELECTIVE', 'ISLAMIC STUDIES'], UA:['URDU ADVANCE', 'URDU ADVANCED', 'URDU ELECTIVE'], STAT:['STATISTICS'],
-  GM:['GENERAL MATHEMATICS', 'GENERAL MATH'], CIV:['CIVICS'], AR:['ARABIC'], PA:['PASHTO'], PS:['PAK-STUDIES', 'PAKISTAN STUDIES', 'PAK STUDIES'], ZOO:['ZOOLOGY'] };
+  GM:['GENERAL MATHEMATICS', 'GENERAL MATH'], CIV:['CIVICS'], AR:['ARABIC'], PA:['PASHTO', 'PUSHTO', 'PASHTU', 'PUSHTU'], PS:['PAK-STUDIES', 'PAKISTAN STUDIES', 'PAK STUDIES'], ZOO:['ZOOLOGY'] };
 const bzH = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '');
 /** 'E-I,U-I,IE (U/M),…' -> [{ code, name, alias }] ; BIO is BOTANY in the 1st year, ZOOLOGY in the 2nd */
 function bzSubs(str){
@@ -1558,6 +1558,9 @@ function bzCheck(rows){
     x.mobFix = x.mobDiff && !!m.full; x.mobNew = m.full;
     x.rollDiff = !!x.b.mroll && String(x.s.matricRoll || '').replace(/\D/g, '').replace(/^0+/, '') !== x.b.mroll.replace(/^0+/, '');
     x.yearDiff = !!x.b.myear && String(x.s.passYear || '').trim() !== x.b.myear;
+    x.empty = [!String(x.s.dob || '').trim() && x.b.dob ? 'DOB' : '', !bzT(x.s.contact) && (m.full || m.part) ? 'Mobile #' : '',
+      !String(x.s.matricRoll || '').trim() && x.b.mroll ? 'Matric Roll No' : '', !String(x.s.passYear || '').trim() && x.b.myear ? 'Passing Year' : '',
+      ![1, 2, 3, 4, 5, 6, 7].some(i => String(x.s['s' + i] || '').trim()) && x.b.subjects ? 'Subjects' : ''].filter(Boolean);   // v8.51 sheet empty, board has it
     x.sub = bzSubDiff(x.s, x.b.subjects); x.subDiff = !!(x.b.subjects && (x.sub.miss.length || x.sub.extra.length)); x.spec = x.sub.special;
     if(x.dobDiff || x.mobDiff || x.rollDiff || x.yearDiff || x.subDiff || x.how !== 'exact') list.push(x);
   });
@@ -1577,6 +1580,7 @@ function bzList(){
   if(bzF === 'dob') return BZ.list.filter(x => x.dobDiff);
   if(bzF === 'mob') return BZ.list.filter(x => x.mobDiff);
   if(bzF === 'near') return BZ.list.filter(x => x.how !== 'exact');
+  if(bzF === 'empty') return BZ.list.filter(x => x.empty && x.empty.length);
   if(bzF === 'roll') return BZ.list.filter(x => x.rollDiff || x.yearDiff);
   if(bzF === 'sub') return BZ.list.filter(x => x.subDiff);
   return BZ.list;
@@ -1630,10 +1634,11 @@ function bzHtml(){
         <td>${l ? `<b style="color:var(--good)">Left</b><div class="sub">${esc([l.pcs, l._st === 'MIGRATED' ? 'migrated' : (l.status || 'cancelled'), l.left ? 'left ' + l.left : ''].filter(Boolean).join(' · '))}: still in the strength sheet</div>` : '<span class="sub">—</span>'}</td></tr>`; }).join('')}</tbody></table>`
     : `<table><thead><tr><th>Board S.No</th><th>Enroll#</th><th>Student</th><th>DOB: sheet → board</th><th>Mobile #: sheet → board</th><th>Matric Roll No / year: sheet → board</th><th>Subjects</th></tr></thead><tbody>
       ${L.map(x => `<tr${x.how === 'near' ? ' style="background:var(--mid-bg)"' : ''}><td>${esc(x.b.sno)}<div class="sub">page ${x.b.page}</div></td><td class="nw">${esc(x.s.roll)}<div class="sub">${esc(x.s.pcs)}</div></td>
-        <td>${esc(x.s.name)}<div class="sub">d/o ${esc(x.s.father)}</div>${x.how === 'near' ? `<div class="sub" style="color:var(--mid);font-weight:700">Board: ${esc(x.b.name)} d/o ${esc(x.b.father)} (${Math.round(x.sc * 100)}% alike: is it her? then tick)</div>` : x.how === 'roll' ? `<div class="sub" style="color:var(--mid);font-weight:700">Board: ${esc(x.b.name)} d/o ${esc(x.b.father)} (same Matric Roll No + year, name spelled differently)</div>` : ''}</td>
-        <td>${dobCell(x)}</td><td>${mobCell(x)}</td><td>${rollCell(x)}</td><td>${subCell(x)}</td></tr>`).join('') || '<tr><td colspan="7" class="sub">✓ Nothing different here.</td></tr>'}</tbody></table>`;
+        <td>${esc(x.s.name)}<div class="sub">d/o ${esc(x.s.father)}</div>${x.how === 'near' ? `<div class="sub" style="color:var(--mid);font-weight:700">Board: ${esc(x.b.name)} d/o ${esc(x.b.father)} (${Math.round(x.sc * 100)}% alike: is it her? then tick)</div>` : x.how === 'roll' ? `<div class="sub" style="color:var(--mid);font-weight:700">Board: ${esc(x.b.name)} d/o ${esc(x.b.father)} (same Matric Roll No + year, name spelled differently)</div>` : ''}
+        ${x.empty && x.empty.length ? `<div class="sub" style="color:var(--bad);font-weight:800">Empty in the sheet: ${esc(x.empty.join(', '))}</div>` : ''}</td>
+        <td>${dobCell(x)}</td><td>${mobCell(x)}</td><td>${rollCell(x)}</td><td>${subCell(x)}</td></tr>`).join('').replace(/\(empty\)/g, '<b style="color:var(--bad)">(empty)</b>') || '<tr><td colspan="7" class="sub">✓ Nothing different here.</td></tr>'}</tbody></table>`;
   return head + `<section class="card">
-    <div class="acts" style="flex-wrap:wrap">${fb('diff', 'All differences', BZ.list.length)}${fb('dob', 'DOB', nDob)}${fb('mob', 'Mobile #', nMob)}${fb('roll', 'Matric Roll No / year', nRoll)}${fb('sub', 'Subjects', nSub)}${fb('spec', 'Ethics / Pak Culture', BZ.spec.length)}${fb('pic', 'Picture missing', BZ.nopic.length)}${fb('near', 'Name spelled differently', nNear)}${BZ.dup.length ? fb('dup', 'Twice in board report', BZ.dup.length) : ''}${fb('nf', 'Not in strength sheet', BZ.nf.length)}${fb('miss', 'Not in board report', BZ.miss.length)}</div>
+    <div class="acts" style="flex-wrap:wrap">${fb('diff', 'All differences', BZ.list.length)}${fb('dob', 'DOB', nDob)}${fb('mob', 'Mobile #', nMob)}${fb('empty', 'Empty in sheet', BZ.list.filter(x => x.empty && x.empty.length).length)}${fb('roll', 'Matric Roll No / year', nRoll)}${fb('sub', 'Subjects', nSub)}${fb('spec', 'Ethics / Pak Culture', BZ.spec.length)}${fb('pic', 'Picture missing', BZ.nopic.length)}${fb('near', 'Name spelled differently', nNear)}${BZ.dup.length ? fb('dup', 'Twice in board report', BZ.dup.length) : ''}${fb('nf', 'Not in strength sheet', BZ.nf.length)}${fb('miss', 'Not in board report', BZ.miss.length)}</div>
     ${bzF === 'nf' ? `<div class="sub" style="margin-top:6px">In the board report but no student with this name + father name in the strength sheet. Each one is looked up in the <b>Left Students</b> sheet too${LEFT && !leftBusy ? `: <b>${BZ.nf.filter(x => bzLeft(x.b)).length}</b> left the college, <b style="color:var(--bad)">${BZ.nf.filter(x => !bzLeft(x.b)).length}</b> found in neither sheet (red)` : ' (reading…)'}${LEFT && LEFT.err ? ' — Left Students sheet: ' + esc(LEFT.err) : ''}.</div>` : bzF === 'miss' ? `<div class="sub" style="margin-top:6px">${esc(bzYear)} students of the strength sheet who are <b>not</b> in this board report: check that they are registered with the board.</div>` : ''}
     <div style="max-height:62vh;overflow:auto;margin-top:8px">${body}</div>
     ${bzF === 'nf' || bzF === 'miss' || bzF === 'pic' ? '' : `<div class="acts" style="margin-top:10px;flex-wrap:wrap"><button class="btn small" id="bzAllD">Tick all DOB</button><button class="btn small" id="bzAllM">Tick all mobile #</button><button class="btn small" id="bzAllR">Tick all Matric Roll No / year</button><button class="btn small" id="bzNone">Untick all</button></div>`}
