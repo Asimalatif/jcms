@@ -1391,7 +1391,7 @@ function wireFx(){
 /* ---------- v8.40 Board check: DOB and mobile # in the BISE "Registration Report for College Record" (draft PDF) vs the strength sheet.
    Students are matched by name + father name (then by a close spelling, never ticked by itself). Nothing is written until you tick rows
    and press "Replace in Transform"; the server re-checks that the sheet still has the value you saw. ---------- */
-let BZ_M = [], BZ_DOC = null, BZ = null, bzBusy = '', bzErr = '', bzMsg = '', bzSel = {}, bzF = 'diff', bzYear = ls.get('bz_year', '1st Year'), bzRest = false;   // v8.47 class + last report remembered on this device
+let bzQ = '', BZ_M = [], BZ_DOC = null, BZ = null, bzBusy = '', bzErr = '', bzMsg = '', bzSel = {}, bzF = 'diff', bzYear = ls.get('bz_year', '1st Year'), bzRest = false;   // v8.47 class + last report remembered on this device
 const BZ_GROUP = { 'pre-medical':['Pre Medical Open', 'Self Morning Medical', 'Evening Pre Medical'], 'pre-engineering':['Pre Engg'], 'general / computer science':['FCS'], 'humanities':['FA'] };
 const BZ_MON = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
 const bzC = s => String(s || '').toUpperCase().replace(/\bM[OU]H[AU]MM[AE]D\b/g, 'MUHAMMAD').replace(/[^A-Z]/g, '');
@@ -1638,7 +1638,9 @@ function bzHtml(){
         ${x.empty && x.empty.length ? `<div class="sub" style="color:var(--bad);font-weight:800">Empty in the sheet: ${esc(x.empty.join(', '))}</div>` : ''}</td>
         <td>${dobCell(x)}</td><td>${mobCell(x)}</td><td>${rollCell(x)}</td><td>${subCell(x)}</td></tr>`).join('').replace(/\(empty\)/g, '<b style="color:var(--bad)">(empty)</b>') || '<tr><td colspan="7" class="sub">✓ Nothing different here.</td></tr>'}</tbody></table>`;
   return head + `<section class="card">
-    <div class="acts" style="flex-wrap:wrap">${fb('diff', 'All differences', BZ.list.length)}${fb('dob', 'DOB', nDob)}${fb('mob', 'Mobile #', nMob)}${fb('empty', 'Empty in sheet', BZ.list.filter(x => x.empty && x.empty.length).length)}${fb('roll', 'Matric Roll No / year', nRoll)}${fb('sub', 'Subjects', nSub)}${fb('spec', 'Ethics / Pak Culture', BZ.spec.length)}${fb('pic', 'Picture missing', BZ.nopic.length)}${fb('near', 'Name spelled differently', nNear)}${BZ.dup.length ? fb('dup', 'Twice in board report', BZ.dup.length) : ''}${fb('nf', 'Not in strength sheet', BZ.nf.length)}${fb('miss', 'Not in board report', BZ.miss.length)}</div>
+    <label for="bzQ">Find a student</label><input id="bzQ" type="search" value="${esc(bzQ)}" placeholder="Name, father name, Enroll#, Matric Roll No or board S.No" autocomplete="off">
+    <div id="bzFound">${bzFindHtml()}</div>
+    <div class="acts" style="flex-wrap:wrap;margin-top:10px">${fb('diff', 'All differences', BZ.list.length)}${fb('dob', 'DOB', nDob)}${fb('mob', 'Mobile #', nMob)}${fb('empty', 'Empty in sheet', BZ.list.filter(x => x.empty && x.empty.length).length)}${fb('roll', 'Matric Roll No / year', nRoll)}${fb('sub', 'Subjects', nSub)}${fb('spec', 'Ethics / Pak Culture', BZ.spec.length)}${fb('pic', 'Picture missing', BZ.nopic.length)}${fb('near', 'Name spelled differently', nNear)}${BZ.dup.length ? fb('dup', 'Twice in board report', BZ.dup.length) : ''}${fb('nf', 'Not in strength sheet', BZ.nf.length)}${fb('miss', 'Not in board report', BZ.miss.length)}</div>
     ${bzF === 'nf' ? `<div class="sub" style="margin-top:6px">In the board report but no student with this name + father name in the strength sheet. Each one is looked up in the <b>Left Students</b> sheet too${LEFT && !leftBusy ? `: <b>${BZ.nf.filter(x => bzLeft(x.b)).length}</b> left the college, <b style="color:var(--bad)">${BZ.nf.filter(x => !bzLeft(x.b)).length}</b> found in neither sheet (red)` : ' (reading…)'}${LEFT && LEFT.err ? ' — Left Students sheet: ' + esc(LEFT.err) : ''}.</div>` : bzF === 'miss' ? `<div class="sub" style="margin-top:6px">${esc(bzYear)} students of the strength sheet who are <b>not</b> in this board report: check that they are registered with the board.</div>` : ''}
     <div style="max-height:62vh;overflow:auto;margin-top:8px">${body}</div>
     ${bzF === 'nf' || bzF === 'miss' || bzF === 'pic' ? '' : `<div class="acts" style="margin-top:10px;flex-wrap:wrap"><button class="btn small" id="bzAllD">Tick all DOB</button><button class="btn small" id="bzAllM">Tick all mobile #</button><button class="btn small" id="bzAllR">Tick all Matric Roll No / year</button><button class="btn small" id="bzNone">Untick all</button></div>`}
@@ -1719,7 +1721,42 @@ function bzSaveSubjects(){
     }catch(e){ bzErr = e.message; }
     bzBusy = ''; render(); };
 }
+/** v8.52 Find a student: every board row and every sheet student of the class, with what the check says about her */
+function bzFind(q){
+  const n = bzC(q), r = String(q).replace(/\s+/g, '').toUpperCase(), num = /\d/.test(q); if(n.length < 2 && r.length < 2) return [];
+  // with a digit: Enroll# / Matric Roll No contain it, board S.No equal to it; else: name or father name contain the letters
+  const hit = (...a) => a.some(v => { const t = String(v || '').replace(/\s+/g, '').toUpperCase(); return num ? (t.includes(r) && (/[A-Z-]/.test(t) || t.length > 4 || t === r)) : (bzC(v) && bzC(v).includes(n)); });
+  const out = [];
+  BZ_M.forEach(x => { if(!hit(x.b.name, x.b.father, x.b.sno, x.b.mroll, x.s && x.s.roll, x.s && x.s.name, x.s && x.s.father, x.dupOf && x.dupOf.s.roll)) return;
+    const t = [];
+    if(x.dupOf) t.push(['bad', 'Twice in board report (other S.No ' + (x.dupOf.b ? x.dupOf.b.sno : '?') + ')']);
+    else if(!x.s){ const l = bzLeft(x.b); t.push(l ? ['mid', 'Not in strength sheet · Left Students: ' + (l.o.roll || '')] : ['bad', 'Not in strength sheet (not in Left Students)']); }
+    else {
+      if(x.how === 'near') t.push(['mid', 'Name spelled differently (' + Math.round((x.sc || 0) * 100) + '%)']); if(x.how === 'roll') t.push(['mid', 'Matched by Matric Roll No']);
+      (x.empty || []).forEach(e => t.push(['bad', 'Empty in sheet: ' + e]));
+      if(x.dobDiff) t.push(['bad', 'DOB ' + (bzD(x.s.dob) || '(empty)') + ' → ' + bzD(x.b.dob)]);
+      if(x.mobDiff) t.push(['bad', 'Mobile ' + (x.s.contact || '(empty)') + ' → ' + x.b.mobile]);
+      if(x.rollDiff || x.yearDiff) t.push(['bad', 'Matric ' + (x.s.matricRoll || '(empty)') + '/' + (x.s.passYear || '') + ' → ' + x.b.mroll + '/' + x.b.myear]);
+      if(x.subDiff) t.push(['bad', 'Subjects differ']);
+      (x.spec || []).forEach(sp => t.push(['mid', sp.subject + ' (sits in ' + sp.instead + ')']));
+      if(BZ.nopic.includes(x)) t.push(['mid', 'Picture missing']);
+      if(!t.length) t.push(['good', '✓ everything the same']);
+    }
+    out.push({ b:x.b, s:x.s || (x.dupOf && x.dupOf.s), t });
+  });
+  (BZ.miss || []).forEach(o => { if(hit(o.name, o.father, o.roll, o.matricRoll)) out.push({ b:null, s:o, t:[['bad', 'Not in board report' + (mlLeftOf(o) ? ' · in Left Students' : '')]] }); });
+  if(num) out.sort((a, b) => ((b.b && b.b.sno === r) || (b.s && String(b.s.roll).toUpperCase().endsWith('-' + r)) ? 1 : 0) - ((a.b && a.b.sno === r) || (a.s && String(a.s.roll).toUpperCase().endsWith('-' + r)) ? 1 : 0));   // exact S.No / Enroll# number first
+  return out.slice(0, 50);
+}
+function bzFindHtml(){
+  if(!bzQ.trim()) return '';
+  const R = bzFind(bzQ), col = { bad:'var(--bad)', mid:'var(--mid)', good:'var(--good)' };
+  return `<div style="margin-top:8px;border:1.5px solid var(--line);border-radius:12px;padding:8px 10px">${R.length ? R.map(r => `<div style="padding:6px 0;border-bottom:1px solid var(--line)">
+      <b>${esc(r.s ? r.s.name : r.b.name)}</b> <span class="sub">d/o ${esc(r.s ? r.s.father : r.b.father)}${r.s ? ' · ' + esc(r.s.roll) + ' · ' + esc(r.s.pcs) : ''}${r.b ? ' · Board S.No ' + esc(r.b.sno) + ' (page ' + r.b.page + ')' + (r.b.mroll ? ' · Matric ' + esc(r.b.mroll + '/' + r.b.myear) : '') : ''}</span>
+      <div>${r.t.map(t => `<span class="sub" style="color:${col[t[0]]};font-weight:700;margin-right:10px">${esc(t[1])}</span>`).join('')}</div></div>`).join('') : '<span class="sub">No student found.</span>'}${R.length === 50 ? '<div class="sub">First 50 shown: type more of the name.</div>' : ''}</div>`;
+}
 function wireBz(){
+  const fq = $('#bzQ'); if(fq) fq.oninput = () => { bzQ = fq.value; const o = $('#bzFound'); if(o) o.innerHTML = bzFindHtml(); };
   if(!LEFT && !leftBusy && online()) loadLeft();
   const y = $('#bzYear'); if(y) y.onchange = () => { bzYear = y.value; ls.set('bz_year', bzYear); if(BZ){ bzCheck(BZ.rows); idbGet('bz_last').then(L => { if(L){ L.year = bzYear; idbSet('bz_last', L); } }); } render(); };
   if(!BZ) bzRestore();
