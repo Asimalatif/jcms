@@ -1566,8 +1566,7 @@ function bzCheck(rows){
     x.sub = bzSubDiff(x.s, x.b.subjects); x.subDiff = !!(x.b.subjects && (x.sub.miss.length || x.sub.extra.length)); x.spec = x.sub.special;
     if(x.dobDiff || x.mobDiff || x.rollDiff || x.roll2Diff || x.yearDiff || x.subDiff || x.how !== 'exact' || (x.empty && x.empty.length)) list.push(x);
   });
-  bzSel = {}; list.forEach(x => { if(x.how === 'near' || !x.s.roll) return; const r = x.s.roll;
-    if(x.dobDiff) bzSel[r + '|dob'] = true; if(x.mobFix) bzSel[r + '|contact'] = true; if(x.rollDiff) bzSel[r + '|matricRoll'] = true; if(x.roll2Diff) bzSel[r + '|matricRoll2'] = true; if(x.yearDiff) bzSel[r + '|passYear'] = true; });
+  bzSel = {};   // v8.54 nothing ticked by itself: tick rows yourself or use the Tick all … buttons
   BZ_M = M;
   const noPic = s => !String(s.pic || '').trim() || /^(null|n\/?a|-|0)$/i.test(String(s.pic).trim());
   const oldPh = BZ && BZ.pics || {};
@@ -1649,7 +1648,7 @@ function bzHtml(){
     ${bzF === 'nf' || bzF === 'miss' || bzF === 'pic' ? '' : `<div class="acts" style="margin-top:10px;flex-wrap:wrap"><button class="btn small" id="bzAllD">Tick all DOB</button><button class="btn small" id="bzAllM">Tick all mobile #</button><button class="btn small" id="bzAllR">Tick all Matric Roll No / year</button><button class="btn small" id="bzNone">Untick all</button></div>`}
     <div class="acts" style="margin-top:10px"><button class="btn" id="bzSubSave" ${bzBusy ? 'disabled' : ''}>Save board subjects in column "BISE Subjects" (${BZ.rows.filter(b => b.subjects).length ? (BZ.subN || 0) : 0})</button></div>
     <div class="acts" style="margin-top:10px"><button class="btn" id="bzOut">PDF / Excel</button><button class="btn primary" id="bzGo" ${n && !bzBusy ? '' : 'disabled'}>${bzBusy ? 'Working…' : 'Replace ' + n + ' in Transform'}</button></div>
-    <div class="sub" style="margin-top:6px">Ticked = the board's value goes into Transform-ALL-COLLEGE-STRENGTH. Rows spelled differently are never ticked by themselves. If the board is wrong (not the sheet), leave the row unticked and get it corrected at the board.</div></section>`;
+    <div class="sub" style="margin-top:6px">Nothing is ticked by itself: tick the rows you have checked (or use Tick all …). Ticked = the board's value goes into Transform-ALL-COLLEGE-STRENGTH. Tick all … leaves out rows whose name is spelled differently: tick those one by one. If the board is wrong (not the sheet), leave the row unticked and get it corrected at the board.</div></section>`;
 }
 const bzPicN = () => BZ ? Object.keys(BZ.pics).filter(r => BZ.pics[r].on && !BZ.pics[r].saved).length : 0;
 /** photos of the students without a picture: the PHOTO cell of her row, cut from the page drawn at 4x */
@@ -1781,7 +1780,7 @@ function wireBz(){
   };
   document.querySelectorAll('[data-bzf]').forEach(b => b.onclick = () => { bzF = b.dataset.bzf; render(); });
   document.querySelectorAll('[data-bz]').forEach(c => c.onchange = () => { bzSel[c.dataset.bz] = c.checked; const g = $('#bzGo'); if(g){ const n = bzCount(); g.textContent = 'Replace ' + n + ' in Transform'; g.disabled = !n; } });
-  const tick = (f, on) => { bzList().forEach(x => { if(!x.s.roll) return;
+  const tick = (f, on) => { bzList().forEach(x => { if(!x.s.roll || (on && x.how === 'near')) return;
     if(f === 'dob' || !on) bzSel[x.s.roll + '|dob'] = on && x.dobDiff;
     if(f === 'contact' || !on) bzSel[x.s.roll + '|contact'] = on && x.mobFix;
     if(f === 'roll' || !on){ bzSel[x.s.roll + '|matricRoll'] = on && x.rollDiff; bzSel[x.s.roll + '|matricRoll2'] = on && x.roll2Diff; bzSel[x.s.roll + '|passYear'] = on && x.yearDiff; } }); render(); };
