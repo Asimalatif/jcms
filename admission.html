@@ -1558,14 +1558,16 @@ function bzCheck(rows){
     x.mobFix = x.mobDiff && !!m.full; x.mobNew = m.full;
     x.rollDiff = !!x.b.mroll && String(x.s.matricRoll || '').replace(/\D/g, '').replace(/^0+/, '') !== x.b.mroll.replace(/^0+/, '');
     x.yearDiff = !!x.b.myear && String(x.s.passYear || '').trim() !== x.b.myear;
+    const r2 = x.s.matricRoll2 === undefined || x.s.matricRoll2 === '-' ? null : String(x.s.matricRoll2).replace(/\D/g, '').replace(/^0+/, '');   // v8.53 second column (Metric RollNo)
+    x.roll2Diff = !x.rollDiff && r2 !== null && !!x.b.mroll && r2 !== x.b.mroll.replace(/^0+/, '');
     x.empty = [!String(x.s.dob || '').trim() && x.b.dob ? 'DOB' : '', !bzT(x.s.contact) && (m.full || m.part) ? 'Mobile #' : '',
-      !String(x.s.matricRoll || '').trim() && x.b.mroll ? 'Matric Roll No' : '', !String(x.s.passYear || '').trim() && x.b.myear ? 'Passing Year' : '',
+      !String(x.s.matricRoll || '').trim() && x.b.mroll ? 'Matric Roll No' : '', x.s.matricRoll2 === '' && String(x.s.matricRoll || '').trim() && x.b.mroll ? 'Metric RollNo' : '', !String(x.s.passYear || '').trim() && x.b.myear ? 'Passing Year' : '',
       ![1, 2, 3, 4, 5, 6, 7].some(i => String(x.s['s' + i] || '').trim()) && x.b.subjects ? 'Subjects' : ''].filter(Boolean);   // v8.51 sheet empty, board has it
     x.sub = bzSubDiff(x.s, x.b.subjects); x.subDiff = !!(x.b.subjects && (x.sub.miss.length || x.sub.extra.length)); x.spec = x.sub.special;
-    if(x.dobDiff || x.mobDiff || x.rollDiff || x.yearDiff || x.subDiff || x.how !== 'exact') list.push(x);
+    if(x.dobDiff || x.mobDiff || x.rollDiff || x.roll2Diff || x.yearDiff || x.subDiff || x.how !== 'exact' || (x.empty && x.empty.length)) list.push(x);
   });
   bzSel = {}; list.forEach(x => { if(x.how === 'near' || !x.s.roll) return; const r = x.s.roll;
-    if(x.dobDiff) bzSel[r + '|dob'] = true; if(x.mobFix) bzSel[r + '|contact'] = true; if(x.rollDiff) bzSel[r + '|matricRoll'] = true; if(x.yearDiff) bzSel[r + '|passYear'] = true; });
+    if(x.dobDiff) bzSel[r + '|dob'] = true; if(x.mobFix) bzSel[r + '|contact'] = true; if(x.rollDiff) bzSel[r + '|matricRoll'] = true; if(x.roll2Diff) bzSel[r + '|matricRoll2'] = true; if(x.yearDiff) bzSel[r + '|passYear'] = true; });
   BZ_M = M;
   const noPic = s => !String(s.pic || '').trim() || /^(null|n\/?a|-|0)$/i.test(String(s.pic).trim());
   const oldPh = BZ && BZ.pics || {};
@@ -1581,7 +1583,7 @@ function bzList(){
   if(bzF === 'mob') return BZ.list.filter(x => x.mobDiff);
   if(bzF === 'near') return BZ.list.filter(x => x.how !== 'exact');
   if(bzF === 'empty') return BZ.list.filter(x => x.empty && x.empty.length);
-  if(bzF === 'roll') return BZ.list.filter(x => x.rollDiff || x.yearDiff);
+  if(bzF === 'roll') return BZ.list.filter(x => x.rollDiff || x.roll2Diff || x.yearDiff);
   if(bzF === 'sub') return BZ.list.filter(x => x.subDiff);
   return BZ.list;
 }
@@ -1595,11 +1597,12 @@ function bzHtml(){
     ${bzBusy ? `<div class="sub" id="bzBusy" style="margin-top:8px">${esc(bzBusy)}</div>` : ''}${bzErr ? `<div class="err" style="margin-top:8px">${esc(bzErr)}</div>` : ''}${bzMsg ? `<div class="sub" style="margin-top:8px;color:var(--good);font-weight:700">${esc(bzMsg)}</div>` : ''}
     ${BZ ? `<div class="sub" style="margin-top:8px"><b>${esc(BZ.file || '')}</b>: ${BZ.rows.length} students in the report · ${BZ.matched} found in the strength sheet (${esc(bzYear)}).</div>` : ''}</section>`;
   if(!BZ) return head;
-  const L = bzList(), nDob = BZ.list.filter(x => x.dobDiff).length, nMob = BZ.list.filter(x => x.mobDiff).length, nNear = BZ.list.filter(x => x.how !== 'exact').length, nRoll = BZ.list.filter(x => x.rollDiff || x.yearDiff).length, nSub = BZ.list.filter(x => x.subDiff).length, n = bzCount();
+  const L = bzList(), nDob = BZ.list.filter(x => x.dobDiff).length, nMob = BZ.list.filter(x => x.mobDiff).length, nNear = BZ.list.filter(x => x.how !== 'exact').length, nRoll = BZ.list.filter(x => x.rollDiff || x.roll2Diff || x.yearDiff).length, nSub = BZ.list.filter(x => x.subDiff).length, n = bzCount();
   const fb = (k, t, c) => `<button class="btn small${bzF === k ? ' primary' : ''}" data-bzf="${k}">${t} ${c}</button>`;
   const ck = (x, f) => x.s.roll ? `<input type="checkbox" data-bz="${esc(x.s.roll + '|' + f)}"${bzSel[x.s.roll + '|' + f] ? ' checked' : ''} style="width:20px;min-height:20px;vertical-align:middle">` : '';
   const dobCell = x => x.dobDiff ? `<label class="nw">${ck(x, 'dob')} ${esc(bzD(x.s.dob) || '(empty)')} → <b>${esc(bzD(x.b.dob))}</b></label>` : '<span class="sub">same</span>';
   const rollCell = x => [x.rollDiff ? `<label class="nw">${ck(x, 'matricRoll')} ${esc(x.s.matricRoll || '(empty)')} → <b>${esc(x.b.mroll)}</b></label>` : '',
+      x.roll2Diff ? `<label class="nw">${ck(x, 'matricRoll2')} Metric RollNo ${esc(x.s.matricRoll2 || '(empty)')} → <b>${esc(x.b.mroll)}</b></label>` : '',
       x.yearDiff ? `<label class="nw">${ck(x, 'passYear')} year ${esc(x.s.passYear || '(empty)')} → <b>${esc(x.b.myear)}</b></label>` : ''].filter(Boolean).join('<br>') || '<span class="sub">same</span>';
   const subCell = x => !x.subDiff ? '<span class="sub">same</span>' : (x.sub.miss.length ? `<div>Board has, sheet not: <b>${esc(x.sub.miss.join(', '))}</b></div>` : '') +
       (x.sub.extra.length ? `<div>Sheet has, board not: <b>${esc(x.sub.extra.join(', '))}</b></div>` : '') + `<div class="sub">${esc(x.b.subjects)}</div>`;
@@ -1736,6 +1739,7 @@ function bzFind(q){
       (x.empty || []).forEach(e => t.push(['bad', 'Empty in sheet: ' + e]));
       if(x.dobDiff) t.push(['bad', 'DOB ' + (bzD(x.s.dob) || '(empty)') + ' → ' + bzD(x.b.dob)]);
       if(x.mobDiff) t.push(['bad', 'Mobile ' + (x.s.contact || '(empty)') + ' → ' + x.b.mobile]);
+      if(x.roll2Diff) t.push(['bad', 'Metric RollNo ' + (x.s.matricRoll2 || '(empty)') + ' → ' + x.b.mroll]);
       if(x.rollDiff || x.yearDiff) t.push(['bad', 'Matric ' + (x.s.matricRoll || '(empty)') + '/' + (x.s.passYear || '') + ' → ' + x.b.mroll + '/' + x.b.myear]);
       if(x.subDiff) t.push(['bad', 'Subjects differ']);
       (x.spec || []).forEach(sp => t.push(['mid', sp.subject + ' (sits in ' + sp.instead + ')']));
@@ -1780,7 +1784,7 @@ function wireBz(){
   const tick = (f, on) => { bzList().forEach(x => { if(!x.s.roll) return;
     if(f === 'dob' || !on) bzSel[x.s.roll + '|dob'] = on && x.dobDiff;
     if(f === 'contact' || !on) bzSel[x.s.roll + '|contact'] = on && x.mobFix;
-    if(f === 'roll' || !on){ bzSel[x.s.roll + '|matricRoll'] = on && x.rollDiff; bzSel[x.s.roll + '|passYear'] = on && x.yearDiff; } }); render(); };
+    if(f === 'roll' || !on){ bzSel[x.s.roll + '|matricRoll'] = on && x.rollDiff; bzSel[x.s.roll + '|matricRoll2'] = on && x.roll2Diff; bzSel[x.s.roll + '|passYear'] = on && x.yearDiff; } }); render(); };
   const a = $('#bzAllD'); if(a) a.onclick = () => tick('dob', true);
   const b = $('#bzAllM'); if(b) b.onclick = () => tick('contact', true);
   const c = $('#bzNone'); if(c) c.onclick = () => tick('', false);
@@ -1810,15 +1814,16 @@ function wireBz(){
     const L = bzList();
     JCWOUT.list({ title:'Board registration check', sub:L.length + ' students · ' + (BZ.file || ''), head:['Board S.No', 'Enroll#', 'Student Name', 'Father Name', 'Section', 'DOB (sheet)', 'DOB (board)', 'Mobile # (sheet)', 'Mobile # (board)', 'Matric Roll/Year (sheet)', 'Matric Roll/Year (board)', 'Subjects: board has, sheet not', 'Subjects: sheet has, board not'],
       rows:L.map(x => [x.b.sno, x.s.roll, x.s.name, x.s.father, x.s.pcs, bzD(x.s.dob), x.dobDiff ? bzD(x.b.dob) : 'same', x.s.contact || '', x.mobDiff ? x.b.mobile : 'same',
-        (x.s.matricRoll || '') + ' / ' + (x.s.passYear || ''), x.rollDiff || x.yearDiff ? x.b.mroll + ' / ' + x.b.myear : 'same', x.sub.miss.join(', '), x.sub.extra.join(', ')]), file:'Board registration check' }); };
+        (x.s.matricRoll || '') + (x.roll2Diff ? ' (Metric RollNo: ' + (x.s.matricRoll2 || 'empty') + ')' : '') + ' / ' + (x.s.passYear || ''), x.rollDiff || x.roll2Diff || x.yearDiff ? x.b.mroll + ' / ' + x.b.myear : 'same', x.sub.miss.join(', '), x.sub.extra.join(', ')]), file:'Board registration check' }); };
   const g = $('#bzGo'); if(g) g.onclick = () => {
     const items = []; BZ.list.forEach(x => { const r = x.s.roll; if(!r) return;
       if(bzSel[r + '|dob'] && x.dobDiff) items.push({ roll:r, name:x.s.name, f:'dob', from:x.s.dob || '', to:x.b.dob });
       if(bzSel[r + '|contact'] && x.mobFix) items.push({ roll:r, name:x.s.name, f:'contact', from:x.s.contact || '', to:x.mobNew });
       if(bzSel[r + '|matricRoll'] && x.rollDiff) items.push({ roll:r, name:x.s.name, f:'matricRoll', from:x.s.matricRoll || '', to:x.b.mroll });
+      if(bzSel[r + '|matricRoll2'] && x.roll2Diff) items.push({ roll:r, name:x.s.name, f:'matricRoll2', from:x.s.matricRoll2 || '', to:x.b.mroll });
       if(bzSel[r + '|passYear'] && x.yearDiff) items.push({ roll:r, name:x.s.name, f:'passYear', from:x.s.passYear || '', to:x.b.myear }); });
     if(!items.length) return;
-    const LBL = { dob:'DOB', contact:'Mobile', matricRoll:'Matric Roll No', passYear:'Passing Year' }, cnt = {}; items.forEach(i => cnt[i.f] = (cnt[i.f] || 0) + 1);
+    const LBL = { dob:'DOB', contact:'Mobile', matricRoll:'Matric Roll No', matricRoll2:'Metric RollNo', passYear:'Passing Year' }, cnt = {}; items.forEach(i => cnt[i.f] = (cnt[i.f] || 0) + 1);
     dlgOpen(`<h2>Replace in Transform?</h2><div class="sub">${Object.keys(cnt).map(k => '<b>' + cnt[k] + '</b> × ' + LBL[k]).join(', ')} in Transform-ALL-COLLEGE-STRENGTH are replaced with the board's values. The old values are kept in the Admission Log.</div>
       <div style="max-height:40vh;overflow:auto;margin-top:8px"><table><tbody>${items.map(i => `<tr><td class="nw">${esc(i.roll)}</td><td>${esc(i.name)}</td><td class="nw">${LBL[i.f]}: ${esc(i.f === 'dob' ? bzD(i.from) : i.from) || '(empty)'} → <b>${esc(i.f === 'dob' ? bzD(i.to) : i.f === 'contact' ? bzFmtMob(i.to) : i.to)}</b></td></tr>`).join('')}</tbody></table></div>
       <div class="acts"><button class="btn" id="dBack">Back</button><button class="btn primary" id="dGo">Replace ${items.length}</button></div>`);
@@ -1827,7 +1832,7 @@ function wireBz(){
       try{
         const r = await api({ action:'adm_bise_fix', items:items.map(i => ({ roll:i.roll, f:i.f, from:i.from, to:i.to })) }, 300000);
         if(!r.ok) throw new Error(r.error === 'UNKNOWN_ACTION' ? 'The server is not updated yet (Admissions.gs).' : r.error);
-        const ci = { dob:idx.cols.indexOf('dob'), contact:idx.cols.indexOf('contact'), matricRoll:idx.cols.indexOf('matricRoll'), passYear:idx.cols.indexOf('passYear') }, ri = idx.cols.indexOf('roll');
+        const ci = { dob:idx.cols.indexOf('dob'), contact:idx.cols.indexOf('contact'), matricRoll:idx.cols.indexOf('matricRoll'), matricRoll2:idx.cols.indexOf('matricRoll2'), passYear:idx.cols.indexOf('passYear') }, ri = idx.cols.indexOf('roll');
         (r.done || []).forEach(d => { const row = idx.rows.find(z => nroll(z[ri]) === nroll(d.roll)); if(row && ci[d.f] >= 0) row[ci[d.f]] = d.to; });
         idbSet('index', idx); bzCheck(BZ.rows);
         bzMsg = (r.done || []).length + ' replaced in Transform' + ((r.skipped || []).length ? '; ' + r.skipped.length + ' skipped (' + r.skipped.slice(0, 3).map(s => s.roll + ': ' + s.msg).join('; ') + ')' : '') + '.';
