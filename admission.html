@@ -2249,7 +2249,8 @@ async function mlPushAlerts(){
     const items = M.filter(c => !c.open && !c.noSeats).map(c => { const empty = c.subs ? c.seats - c.inHome : c.seats - c.held, bad = c.rows.filter(r => r.state === 'bad').length;
       // v8.44 every eligible student: the possible candidates for the empty seats and everyone next in line (to move up), in merit order
       const el = c.rows.filter(r => !r.here && (r.cand || r.state === 'next')).map(r => [r.o.name, r.o.roll || '', r.o._a / 100, (prog(r.o.key) || {}).label || r.o.key, r.o._late ? 'late fee' : '']);
-      return { l:c.label, q:c.quota, s:c.seats, e:Math.max(0, empty), b:bad, c:el.slice(0, 60), n:el.length }; }).filter(x => x.e > 0 || x.b > 0 || x.n > 0);
+      const e = Math.max(0, empty);   // v8.45 next students only while a seat is empty (a full list shows nobody)
+      return { l:c.label, q:c.quota, s:c.seats, e, b:bad, c:e ? el.slice(0, 60) : [], n:e ? el.length : 0 }; }).filter(x => x.e > 0 || x.b > 0);
     const sig = JSON.stringify(items), old = ls.get('mlAlertSig', '');
     if(sig === old && Date.now() - ls.get('mlAlertT', 0) < 6 * 3600000) return;     // nothing new (sent again every 6 hours)
     const r = await api({ action:'adm_alerts_save', items });
@@ -2261,29 +2262,34 @@ async function mlPushAlerts(){
 function mlShiftRows(c, all, cand){
   const M = all ? meritLists().filter(x => x.subs && x.feeSub && !x.open && !x.noSeats) : [c], out = [], seen = new Set();
   M.forEach(L => { const sub = L.fee || 60000;
+    // v8.46 merit set = lowest Aggregate on a seat; HQ helped if her marks alone are below it
+    const cut = Math.min(...L.rows.filter(r => r.rank <= L.seats && r.here && r.o._a).map(r => r.o._a));
     L.rows.forEach(r => { const o = r.o; if(!((r.rank <= L.seats && r.here) || (cand && r.cand))) return;
       const paid = feeOf(o.challan).filter(x => x.paid && x.amount >= sub * .8).reduce((t, x) => t + x.amount, 0); if(paid <= sub * 1.05) return;
-      const k = nroll(o.roll) || o.name; if(seen.has(k)) return; seen.add(k); out.push({ o, q:L.quota, cand:!!r.cand && !(r.rank <= L.seats && r.here) }); }); });
+      const m = Number(String(o.metric || '').replace(/,/g, '')), t = Number(String(o.total || '').replace(/,/g, '')), hqHelp = /^y/i.test(o.hq || '') && t > 0 && isFinite(cut) && Math.round(m * 10000 / t) < cut;
+      const k = nroll(o.roll) || o.name; if(seen.has(k)) return; seen.add(k); out.push({ o, q:L.quota, cand:!!r.cand && !(r.rank <= L.seats && r.here), rank:r.rank, sub, paid, hqHelp, cut }); }); });
   return out.sort((a, b) => (b.o._a - a.o._a) || (Number(b.o.metric) - Number(a.o.metric)) || String(a.o._d).localeCompare(String(b.o._d)));
 }
-function mlShiftAsk(c){
+function mlShiftAsk(c, refund){
   if(!c) return;
   const d = new Date(), today = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
   const cnt = () => mlShiftRows(c, $('#shAll').checked, $('#shCand').checked).length;
-  dlgOpen(`<h2>Shifting letter (Word)</h2>
-    <div class="sub">Your letter to <b>The Director Admissions, University of Peshawar</b>: "students are hereby shifted from F.Sc-I (Non-subsidized, Morning) to F.Sc-I (subsidized, Morning) on <i>date</i>", with S.No, Student Name, Father Name and Marks (obtained / total matric marks, e.g. 1146/1200; the quota is written after the marks when it is not Open Quota). Students: on a subsidized seat but paid the non-subsidized fee, highest Aggregate first.</div>
-    <label class="f">Date of shifting<input id="shDate" value="${today}" style="height:42px"></label>
+  dlgOpen(`<h2>${refund ? 'Half-fee refund list' : 'Shifting letter (Word)'}</h2>
+    ${refund ? '<div class="sub">Students on a subsidized seat who paid the non-subsidized fee, with the amount to refund, highest Aggregate first. Students whose matric marks alone are below the merit but whose HQ (+20) marks put them on a seat are marked, with their Aggregate.</div>' : ''}
+    <div class="sub"${refund ? ' style="display:none"' : ''}>Your letter to <b>The Director Admissions, University of Peshawar</b>: "students are hereby shifted from F.Sc-I (Non-subsidized, Morning) to F.Sc-I (subsidized, Morning) on <i>date</i>", with S.No, Student Name, Father Name and Marks (obtained / total matric marks, e.g. 1146/1200; the quota is written after the marks when it is not Open Quota). Students: on a subsidized seat but paid the non-subsidized fee, highest Aggregate first.</div>
+    <label class="f"${refund ? ' style="display:none"' : ''}>Date of shifting<input id="shDate" value="${today}" style="height:42px"></label>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="shAll"> Also the other subsidized quotas (Minority, O-Level, …): their students on a seat who paid the non-subsidized fee</label>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="shCand"> Also the possible candidates for the empty seats</label>
     <div class="sub">Without ticks: only <b>${esc(c.label)} · ${esc(c.quota)}</b>. The possible candidates (yellow rows, e.g. serial 84 and 85) are the students for the empty seats of this list only.</div>
     <div class="sub" id="shN"></div>
-    <div class="acts"><button class="btn primary" id="shGo">Make the Word letter</button><button class="btn" id="shX">Close</button></div>`);
-  const upd = () => { $('#shN').textContent = cnt() + ' students will be in the letter.'; };
+    <div class="acts"><button class="btn primary" id="shGo">${refund ? 'Make the refund list' : 'Make the Word letter'}</button><button class="btn" id="shX">Close</button></div>`);
+  const upd = () => { $('#shN').textContent = cnt() + ' students will be in the ' + (refund ? 'refund list.' : 'letter.'); };
   $('#shAll').onchange = upd; $('#shCand').onchange = upd; upd();
   $('#shX').onclick = dlgClose;
   $('#shGo').onclick = async () => { const b = $('#shGo'); b.disabled = true; b.textContent = 'Making…';
-    try{ await mlShiftWord(mlShiftRows(c, $('#shAll').checked, $('#shCand').checked), $('#shDate').value.trim() || today); dlgClose(); }
-    catch(e){ toast('Not made: ' + (e.message || e)); b.disabled = false; b.textContent = 'Make the Word letter'; } };
+    try{ const L = mlShiftRows(c, $('#shAll').checked, $('#shCand').checked); if(refund){ mlRefundOut(c, L, $('#shAll').checked); dlgClose(); return; }
+      await mlShiftWord(L, $('#shDate').value.trim() || today); dlgClose(); }
+    catch(e){ toast('Not made: ' + (e.message || e)); b.disabled = false; b.textContent = refund ? 'Make the refund list' : 'Make the Word letter'; } };
 }
 async function mlShiftWord(list, date){
   if(!list.length) throw new Error('No students to shift.');
@@ -2294,7 +2300,7 @@ async function mlShiftWord(list, date){
   const i = x.indexOf('{NAME}'), s = x.lastIndexOf('<w:tr ', i), e = x.indexOf('</w:tr>', i) + 7, pat = x.slice(s, e);
   const xe = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const rows = list.map(it => { const q = /^open/i.test(String(it.q || '').trim()) ? '' : it.q;
-    return pat.replace('{NAME}', xe(it.o.name)).replace('{FATHER}', xe(it.o.father || '')).replace('{MARKS}', xe(String(it.o.metric || '').replace(/\.0+$/, '') + (it.o.total ? '/' + String(it.o.total).replace(/\.0+$/, '') : '')) + (q ? ' ' : ''))   // obtained / total, e.g. 1146/1200
+    return pat.replace('{NAME}', xe(it.o.name)).replace('{FATHER}', xe(it.o.father || '')).replace('{MARKS}', xe(String(it.o.metric || '').replace(/\.0+$/, '') + (it.o.total ? '/' + String(it.o.total).replace(/\.0+$/, '') : '') + (it.hqHelp ? ' + 20 HQ, Aggregate ' + it.o._a / 100 + '%' : '')) + (q ? ' ' : ''))   // obtained / total, e.g. 1146/1200
       .replace('{QUOTA}', q ? xe('(' + q + ')') : ''); });
   x = x.slice(0, s) + rows.join('') + x.slice(e);
   x = x.replace('{DATE}', xe(date));
@@ -2304,6 +2310,18 @@ async function mlShiftWord(list, date){
   if(window.JCWOUT) JCWOUT.offer({ blob, name, title:'Shifting letter (Word)', sub:list.length + ' students · ' + date, noPdf:true, noXl:true,
     extra:[{ label:'Download', fn:() => { JCWOUT.download(blob, name); toast('Downloaded: ' + name); } }, { label:'Open / share', fn:() => JCWOUT.share(blob, name, 'Shifting letter') }] });
   else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); }
+}
+/* v8.46 half-fee refund list: this quota or all subsidized quotas; HQ + Aggregate columns only when HQ put someone on a seat */
+function mlRefundOut(c, R, all){
+  if(!R.length) throw new Error('Nobody on a subsidized seat paid more than the subsidized fee.');
+  if(!window.JCWOUT) throw new Error('The list tool is not loaded.');
+  const now = R.filter(x => !x.cand), tot = now.reduce((t, x) => t + x.paid - x.sub, 0), hq = R.some(x => x.hqHelp);
+  JCWOUT.list({ title:'Half-fee refund · ' + (all ? c.label + ' · all subsidized quotas' : c.label + ' · ' + c.quota),
+    sub:now.length + ' students on a subsidized seat paid the full fee · refund Rs ' + tot.toLocaleString('en-PK') + (R.length > now.length ? ' · ' + (R.length - now.length) + ' possible candidate(s) listed: refund only if moved in' : '') + (hq ? ' · HQ = on a seat only because of the HQ +20 marks' : ''),
+    head:['Merit #', 'Enroll#', 'Student Name', 'Father Name', 'Program', 'Section'].concat(all ? ['Quota'] : []).concat(hq ? ['Obtained', 'HQ', 'Aggregate'] : []).concat(['Fee paid', 'Subsidized fee', 'Refund', 'Note']),
+    rows:R.map(x => { const o = x.o; return [x.rank, o.roll || '', o.name, o.father || '', (prog(o.key) || {}).label || o.key, o.pcs || ''].concat(all ? [x.q] : [])
+      .concat(hq ? [(o.metric || '') + (o.total ? '/' + o.total : ''), x.hqHelp ? 'Yes (+20): eligible due to HQ' : '', x.hqHelp ? o._a / 100 : ''] : [])
+      .concat([x.paid, x.sub, x.paid - x.sub, x.cand ? 'Possible candidate: refund only if moved in' : 'On a subsidized seat']); }) });
 }
 /* ---------- v8.4: all programs and quotas in one PDF / Excel / Word file, with photos ---------- */
 const mlSeatTxt = (c, r) => (r.cand ? 'POSSIBLE CANDIDATE' : r.state === 'surplus' ? 'SURPLUS' : r.rank <= c.seats ? 'On a seat' : r.state === 'next' ? 'NEXT IN LINE' : r.state === 'bad' ? 'WRONG PLACE' : 'Waiting')
@@ -2522,14 +2540,7 @@ function wireMl(){
       rows:c.leftTop.map(x => { const o = x.o; return [x.pos, o.roll || '', o.name, o.father || '', o._left ? o.program : (prog(o.key) || {}).label || o.key, o.pcs || '', o.hq || '', o.metric || '', o.total || '', o._a ? o._a / 100 : '', o.dob || '', o.challan || '', st(o),
         o._left ? 'Left Students sheet' : mlLeftOf(o) ? 'Strength sheet + Left Students sheet' : 'Strength sheet (status)']; }) }); };
   const sf = $('#mlShift'); if(sf) sf.onclick = () => mlShiftAsk(cur());
-  const rf = $('#mlRef'); if(rf) rf.onclick = () => { const c = cur(); if(!c || !window.JCWOUT) return;
-    const sub = c.fee || 60000, paidOf = o => feeOf(o.challan).filter(x => x.paid && x.amount >= sub * 0.8).reduce((t, x) => t + x.amount, 0);
-    const R = c.rows.filter(r => (r.rank <= c.seats && r.here) || r.cand).map(r => ({ r, paid:paidOf(r.o) })).filter(x => x.paid > sub * 1.05);
-    if(!R.length) return toast('Nobody inside the ' + c.seats + ' seats paid more than Rs ' + sub.toLocaleString('en-PK') + '.');
-    const now = R.filter(x => !x.r.cand), tot = now.reduce((t, x) => t + x.paid - sub, 0);
-    JCWOUT.list({ title:'Half-fee refund · ' + c.label + ' · ' + c.quota, sub:now.length + ' students on a subsidized seat paid the full fee · refund Rs ' + tot.toLocaleString('en-PK') + (R.length > now.length ? ' · ' + (R.length - now.length) + ' possible candidate(s) listed: refund only if moved in' : ''),
-      head:['Merit #', 'Enroll#', 'Student Name', 'Father Name', 'Program', 'Section', 'Aggregate', 'Fee paid', 'Subsidized fee', 'Refund', 'Note'],
-      rows:R.map(x => { const o = x.r.o; return [x.r.rank, o.roll || '', o.name, o.father || '', (prog(o.key) || {}).label || o.key, o.pcs || '', o._a ? o._a / 100 : '', x.paid, sub, x.paid - sub, x.r.cand ? 'Possible candidate: refund only if moved in' : 'On a subsidized seat']; }) }); };
+  const rf = $('#mlRef'); if(rf) rf.onclick = () => mlShiftAsk(cur(), true);
   const pp = $('#mlPdf'); if(pp) pp.onclick = mlPhotoPdf;
   document.querySelectorAll('[data-mlall]').forEach(b => b.onclick = () => mlAllOut(b.dataset.mlall));
   const mc = $('#mlColor'); if(mc) mc.onchange = () => { try{ mc.checked ? localStorage.setItem('jcw_color_pdf', '1') : localStorage.removeItem('jcw_color_pdf'); }catch(e){} toast(mc.checked ? 'PDFs on this device: in colour' : 'PDFs on this device: black & white (saves ink)'); };
