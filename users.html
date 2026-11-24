@@ -195,6 +195,8 @@ function edit(r){
       <div style="margin-top:12px"><b>Screens to hide</b> <span class="sub">(only for this login; role rules are at the bottom of the page)</span></div>
       ${(D.screens || []).map(x => `<label class="ck"><input type="checkbox" data-es="hide${x.key}" ${r.svc.includes('hide' + x.key) ? 'checked' : ''}><span><b>Hide ${esc(x.label)}</b></span></label>`).join('')}
       <label class="ck" style="margin-top:8px"><input type="checkbox" id="eB" ${r.blocked ? 'checked' : ''}><span><b>Login switched off</b><small>She cannot sign in (nothing is deleted).</small></span></label></div>`}
+    ${r.admin ? `<div style="margin-top:12px"><b>Screens to hide</b> <span class="sub">(only for you, the main admin; every service stays yours)</span></div>
+      ${(D.screens || []).map(x => `<label class="ck"><input type="checkbox" data-es="hide${x.key}" ${r.svc.includes('hide' + x.key) ? 'checked' : ''}><span><b>Hide ${esc(x.label)}</b></span></label>`).join('')}` : ''}
     <div id="eErr"></div>
     <div class="acts"><button class="btn p" id="eGo">${n ? 'Add login' : 'Save'}</button><button class="btn" id="eNo">Cancel</button></div>`;
   const d = $('#dlg'); d.showModal();
@@ -209,7 +211,7 @@ function edit(r){
     const rec = { teacher:v('#eT'), username:v('#eU'), role:v('#eR'), dept:v('#eD'), desig:v('#eG'), contact:v('#eC'), status:v('#eS'), cp:v('#eCP'), tt:v('#eTT'),
       svc:subSvc(), blocked:!!($('#eB') && $('#eB').checked) };
     if(rec.svc === null) return $('#eErr').innerHTML = '<div class="note bad">A ticked service needs at least one of its parts. Untick the service or tick a part.</div>';
-    if(r.admin){ rec.svc = []; rec.blocked = false; }
+    if(r.admin){ rec.svc = (rec.svc || []).filter(k => /^hide/.test(k)); rec.blocked = false; }   // v8.48 the admin may hide screens for herself
     const np = v('#eP');
     if(!rec.teacher || !rec.username) return $('#eErr').innerHTML = '<div class="note bad">Type the name and the username.</div>';
     if(n && (!np || np.length < 4)) return $('#eErr').innerHTML = '<div class="note bad">Type a password of at least 4 characters.</div>';
