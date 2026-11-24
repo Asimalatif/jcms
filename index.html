@@ -752,7 +752,7 @@ const store = {
 let mode = store.get('mode', 'att'), panelHidden = store.get('phide', false), mtDraft = { total:'', marks:{} };
 let user = store.get('user', ''), pass = store.get('pass', ''), teacher = store.get('teacher', ''), isAdmin = store.get('admin', false);
 let svc = store.get('svc', []);   // v8.19 services the admin switched on for this login (Logins & services page)
-const svcHid = k => !isAdmin && (svc || []).includes('hide' + k);   // v8.35 screens the admin switched off for this login / role (att, mt, gt, dt)
+const svcHid = k => isAdmin ? k === 'att' && store.get('admHideAtt', false) : (svc || []).includes('hide' + k);   // v8.48 the admin can hide her own Attendance tab (this device)   // v8.35 screens the admin switched off for this login / role (att, mt, gt, dt)
 const setSvc = a => { a = Array.isArray(a) ? a : []; const ch = a.join() !== (svc || []).join(); svc = a; store.set('svc', a); return ch; };
 let sheets = store.get('sheets', []), data = store.get('data', {}), queue = store.get('queue', []), confirms = store.get('confirms', {});
 // reports to the Chief Proctor: rq = reports waiting to reach the server, myReports = reports already on the server, cps = Chief Proctors (CP1 / CP2)
@@ -3579,9 +3579,11 @@ function renderHome(){
   if(myRows().length) h += myTTCard();
   if(canFree()) h += freeCard();
   if(college && cur.length) h += college;
+  if(isAdmin) h += `<div class="sub" style="text-align:center;margin:14px 0 4px">Attendance tab: <b>${svcHid('att') ? 'hidden' : 'shown'}</b> for you · <a href="#" onclick="admAttTog();return false" style="color:var(--brown);font-weight:700">${svcHid('att') ? 'Show it' : 'Hide it'}</a></div>`;   // v8.48
   h += '</div></main>';
   $q('#app').innerHTML = h;
 }
+function admAttTog(){ store.set('admHideAtt', !store.get('admHideAtt', false)); if(appView === 'att') appView = 'home'; rerender(); }
 /* ---------- Reports tab: low attendance + student profile (moved here from Home) ---------- */
 function lowCard(cur){
   const lows = lowList(lowMode, cur), wk = weekRange(), now = new Date();
