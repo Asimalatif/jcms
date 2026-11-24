@@ -304,7 +304,7 @@ let E = null;
 function certVals(r){
   const D = S.data, two = /2nd/i.test(D.sheet);
   const y = Number((D.sheet.match(/20\d\d/) || [new Date().getFullYear()])[0]);
-  return { name:r.name, father:r.father, group:r.group || (two ? 'H.S.S.C (Part-II)' : 'H.S.S.C (Part-I)'), session:r.session || (y - 1) + '-' + String(y).slice(2), roll:r.roll, reg:r.reg, marks:r.marks,
+  return { name:r.name, father:r.father, group:r.group || '', session:r.session || (y - 1) + '-' + String(y).slice(2), roll:r.roll, reg:r.reg, marks:r.marks,
     total:r.total || D.total, grade:r.grade, dob:r.dob, dist:r.dist || 'NIL', conduct:r.conduct || 'GOOD' };
 }
 function certHtml(v){
