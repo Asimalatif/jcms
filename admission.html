@@ -808,6 +808,7 @@ async function sync(){
         if(r.seats && init){ init.seats = r.seats; ls.set('adm_init', init); }
         if(r.next && r.next.roll) nextRoll[item.d.d.program + '|' + item.d.d.year] = { roll:r.next.roll, t:Date.now() };
         if(lastDone && lastDone.name === item.d.d.name && !item.d.ctx) lastDone.roll = r.roll;
+        if(!r.nothing) mrAuto(true);   // v8.47 MeritNo again after every save
         toast(r.nothing ? 'No change to save for ' + item.d.d.name : (item.d.ctx ? 'Updated: ' : 'Admitted: ') + item.d.d.name + ' · ' + (r.roll || ''), 4500);
       } else if(r){
         item.state = r.error ? 'error' : 'problem';
@@ -1118,7 +1119,7 @@ async function pnAdd(list, force){
       <div class="acts"><button class="btn${askList.length ? '' : ' primary'}" id="dOk">OK</button>${askList.length ? `<button class="btn danger" id="dForce">Add ${askList.length} anyway</button>` : ''}</div>`);
     $('#dOk').onclick = dlgClose;
     const F = $('#dForce'); if(F) F.onclick = () => pnAdd(askList, true);
-    if(ok.length) toast(ok.length + ' added to the strength sheet', 4000);
+    if(ok.length){ toast(ok.length + ' added to the strength sheet', 4000); mrAuto(true); }
   } catch(e){
     if(e.fatal){ dlgClose(); fatal = e.message; }
     else dlgOpen(`<h2>Not added</h2><div class="err">${esc(e.message)}</div><div class="sub">Nothing is lost: the list stays here. If the internet dropped while adding, press Refresh first so nobody is added twice.</div><div class="acts"><button class="btn primary" id="dOk">OK</button></div>`), ($('#dOk').onclick = dlgClose);
@@ -1199,6 +1200,21 @@ async function rfFixList(){
   JCWOUT.list({ title:'Fix on the UOP portal', sub:r.rows.length + ' values: the college keeps its own value, the portal has a wrong one (wrong program → wrong subjects, old marks before IBCC equivalence …). Correct them on portal.uop.edu.pk/Student/Students.',
     head:['#', 'Enroll#', 'Student Name', 'Section', 'Column', 'Correct (college)', 'On the portal now', 'Why', 'Kept by', 'When'],
     rows:r.rows.map((x, i) => [i + 1, x[0], x[1], x[2], x[4], x[5], x[6], x[7], x[8], x[9]]), file:'Fix on the UOP portal' });
+}
+/* v8.47 Aggregate + MeritNo (+ Age-wise) written again by the software's rule, quietly: after every save / admission,
+   and on opening Admissions (every 10 minutes at most), so a change typed straight into the sheet (HQ, marks, quota) is caught */
+let mrBusy = false, mrAgain = false;
+async function mrAuto(force){
+  if(!online() || !user) return;
+  if(mrBusy){ mrAgain = true; return; }
+  if(!force && Date.now() - ls.get('adm_mr_t', 0) < 10 * 60000) return;
+  mrBusy = true;
+  try{ await new Promise(res => setTimeout(res, 1500));   // let quick saves in a row finish first
+    const r = await api({ action:'adm_refresh', fields:['aggregate', 'merit'], apply:true, accept:{} }, 300000);
+    if(r && r.ok){ ls.set('adm_mr_t', Date.now()); const n = (r.counts && ((r.counts.aggregate || 0) + (r.counts.merit || 0) + (r.counts.agewise || 0))) || 0;
+      if(n){ toast('MeritNo worked out again: ' + n + ' cell' + (n === 1 ? '' : 's') + ' updated', 4000); ML = null; loadIndex(true); } } }
+  catch(e){}
+  finally{ mrBusy = false; if(mrAgain){ mrAgain = false; mrAuto(true); } }
 }
 async function rfRun(apply){
   rfBusy = true; render();
@@ -2948,7 +2964,7 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch
   render();
   idx = await idbGet('index');
   if(idx) setTimeout(mlPushAlerts, 3000);
-  if(online() && user){ await refreshInit(); await loadIndex(false); fxLoad(false); sync(); if(tab === 'find' || tab === 'merit') render(); pnLoad(false); }
+  if(online() && user){ await refreshInit(); await loadIndex(false); fxLoad(false); sync(); if(tab === 'find' || tab === 'merit') render(); pnLoad(false); mrAuto(false); }
 })();
 </script>
 </body>
