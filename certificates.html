@@ -109,7 +109,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&am
 const ls = { get(k, d){ try{ const v = localStorage.getItem('csa2_' + k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem('csa2_' + k, JSON.stringify(v)); }catch(e){} } };
 const user = ls.get('user', ''), pass = ls.get('pass', '');
 const qs = new URLSearchParams(location.search);
-let S = { sheets:null, sheet:qs.get('sheet') || ls.get('pc_sheet', ''), strength:ls.get('pc_strength', ''), data:null, stats:null, busy:'', err:'', msg:'', filter:qs.get('filter') || 'all', q:'', auto:null, assets:ls.get('pc_assets', null), pdf:null };
+let S = { sheets:null, sheet:qs.get('sheet') || ls.get('pc_sheet', ''), strength:ls.get('pc_strength', ''), data:null, stats:null, busy:'', err:'', msg:'', filter:qs.get('filter') || 'all', q:'', auto:null, assets:ls.get('pc_assets', null), pdf:null, dob:ls.get('pc_dob', true), q2:ls.get('pc_q', []) };   // v8.56 dob = print Date of Birth; q2 = changes made offline
 
 async function api(payload, ms = 330000){
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
@@ -120,7 +120,7 @@ async function api(payload, ms = 330000){
     if(j && j.error === 'BAD_LOGIN') throw new Error('Your saved login was refused. Open the app, sign out and sign in again.');
     if(j && j.ok === false) throw new Error(j.error || 'Failed');
     return j;
-  }catch(e){ if(e.name === 'AbortError') throw new Error('The server took too long. Try again.'); if(e instanceof TypeError) throw new Error(navigator.onLine ? 'The internet works, but the Apps Script server did not answer. In Apps Script: run the function pcAuthorize once and press Allow, then Deploy → Manage deployments → Edit → New version. Also check that Certificates.gs saved without a red error.' : 'No internet.'); throw e; }
+  }catch(e){ if(e.name === 'AbortError'){ const x = new Error('The server took too long. Try again.'); x.net = true; throw x; } if(e instanceof TypeError){ const x = new Error(navigator.onLine ? 'The internet works, but the Apps Script server did not answer. In Apps Script: run the function pcAuthorize once and press Allow, then Deploy → Manage deployments → Edit → New version. Also check that Certificates.gs saved without a red error.' : 'No internet.'); x.net = true; throw x; } throw e; }
   finally{ clearTimeout(t); }
 }
 
@@ -239,11 +239,13 @@ function render(){
   ${D ? `
   <section class="card" style="--c:#0E8A5F"><h2>Certificates</h2>
     <div class="stats">
-      ${[['all', c.all, 'JCW students'], ['ready', c.print, 'ready to print'], ['match', c.match, 'ready but no Enroll#'], ['fail', c.fail, 'fail / no grade / no roll no'], ['left', c.left, 'left / struck'], ['hint', c.hint, 'possible left — check'], ['dist', c.dist, 'top 20 / distinctions'], ['nodob', c.nodob, 'ready but no DOB']].map(x => `<button data-f="${x[0]}" class="${S.filter === x[0] ? 'on' : ''}"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}
+      ${[['all', c.all, 'JCW students'], ['ready', c.print, 'ready to print'], ['match', c.match, 'ready but no Enroll#'], ['fail', c.fail, 'fail / no grade / no roll no'], ['left', c.left, 'left / struck'], ['hint', c.hint, 'possible left — check'], ['dist', c.dist, 'top 20 / distinctions'], ].concat(S.dob ? [['nodob', c.nodob, 'ready but no DOB']] : []).map(x => `<button data-f="${x[0]}" class="${S.filter === x[0] ? 'on' : ''}"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}
     </div>
     <div class="sub" style="margin-top:8px"><b>Ready · no Enroll#</b> = she passed and her certificate can print, but she is not yet linked to a student in Transform, so her DOB and left-student status could not be checked. Tap her and choose the right student. <b>Not eligible</b> shows the reason on each row.</div>
     ${c.open ? `<div class="note mid">${c.open} students were not matched 100% (${(S.auto || []).length} of them 96%+). Nothing is saved until you tick them. <button class="btn sm ok" id="cAuto" ${S.busy ? 'disabled' : ''}>Check and fill ${c.open}</button></div>` : ''}
     ${c.hint ? `<div class="note mid">${c.hint} students look like Left Students with a slightly different spelling. They are NOT struck yet. <button class="btn sm" id="cLeftRev" ${S.busy ? 'disabled' : ''}>Review ${c.hint} possible left</button></div>` : ''}
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0 0;font-weight:700;cursor:pointer"><input type="checkbox" id="cDob" ${S.dob ? 'checked' : ''} style="width:20px;height:20px"> Print Date of Birth on the certificates <span class="sub" style="font-weight:400">(untick = the Date of Birth line is left out; for Print, PDF and Drive)</span></label>
+    ${qHtml()}
     <div class="acts">
       <button class="btn pri" id="cPrintAll" ${!c.print ? 'disabled' : ''}>Print — all ${c.print} ready</button>
       <button class="btn" id="cPdfOpen" ${S.busy || !c.print ? 'disabled' : ''}>${S.busy === 'pdf' ? 'Making PDF…' : 'PDF — open · print · download · share'}</button>
@@ -277,7 +279,7 @@ function paintList(){
   const lab = { ready:['t-ready', 'Ready'], match:['t-match', 'Not linked'], fail:['t-fail', 'Not eligible'], left:['t-left', 'Left'] };
   box.innerHTML = (L.length ? '' : '<div class="sub">Nobody here.</div>') + L.slice(0, max).map(r => {
     const st = status(r), t = st === 'match' && canPrint(r) ? ['t-match', 'Ready · no Enroll#'] : lab[st];
-    return `<div class="it ${r.struck ? 'struck' : ''}" data-row="${r.row}"><div class="tx"><b>${esc(r.name)}</b><small>D/o ${esc(r.father)} · Roll ${esc(r.roll || '—')} · ${esc(r.marks || '—')} · ${esc(r.grade || '—')}${r.enroll ? ' · ' + esc(r.enroll) : ''}${r.pcs ? ' · ' + esc(r.pcs) : ''}${r.pstatus ? ' · Portal: ' + esc(r.pstatus) : ''}</small>${r.remarks ? `<small>Remarks: ${esc(r.remarks)}</small>` : ''}${hasDist(r) ? `<small style="color:var(--good);font-weight:700">Distinction: ${esc(r.dist)}</small>` : r.pos && Number(r.pos) <= 20 ? `<small style="color:var(--blue);font-weight:700">Board position ${esc(r.pos)} — no distinction typed</small>` : ''}${st === 'fail' ? `<small style="color:var(--bad);font-weight:700">Not eligible: ${esc(whyNot(r))}</small>` : ''}${st === 'left' ? `<small style="color:var(--muted);font-weight:700">${esc(r.how || 'Struck through')}</small>` : ''}${r.leftHint ? `<small style="color:var(--mid);font-weight:700">Possible left student: ${esc(hintText(r.leftHint))}</small>` : ''}${!r.struck && !r.enroll ? (() => { const qc = quickCands(r); return qc.length ? `<div class="qc">${qc.map(c => { const p = Math.round(c.sc * 100); return `<button type="button" class="${S.picks[r.row] === c.s.id ? 'on' : ''}" data-qrow="${r.row}" data-qpick="${esc(c.s.id)}"><span class="p ${p >= 90 ? 'hi' : p >= 75 ? 'md' : ''}">${p}%</span><b>${esc(c.s.name)}</b> <small>D/o ${esc(c.s.father)}${c.s.enroll ? ' · ' + esc(c.s.enroll) : ''}${c.s.pcs ? ' · ' + esc(c.s.pcs) : ''}</small></button>`; }).join('')}</div>` : '<small style="color:var(--muted)">No 60%+ student in the list — open her to search.</small>'; })() : ''}</div>${canPrint(r) && !r.dob ? '<span class="tag t-warn">No DOB</span>' : ''}<span class="tag ${t[0]}">${t[1]}</span></div>`;
+    return `<div class="it ${r.struck ? 'struck' : ''}" data-row="${r.row}"><div class="tx"><b>${esc(r.name)}</b>${qOf(r) ? ' <small style="color:var(--blue);font-weight:800">· changed offline, waiting to send</small>' : ''}<small>D/o ${esc(r.father)} · Roll ${esc(r.roll || '—')} · ${esc(r.marks || '—')} · ${esc(r.grade || '—')}${r.enroll ? ' · ' + esc(r.enroll) : ''}${r.pcs ? ' · ' + esc(r.pcs) : ''}${r.pstatus ? ' · Portal: ' + esc(r.pstatus) : ''}</small>${r.remarks ? `<small>Remarks: ${esc(r.remarks)}</small>` : ''}${hasDist(r) ? `<small style="color:var(--good);font-weight:700">Distinction: ${esc(r.dist)}</small>` : r.pos && Number(r.pos) <= 20 ? `<small style="color:var(--blue);font-weight:700">Board position ${esc(r.pos)} — no distinction typed</small>` : ''}${st === 'fail' ? `<small style="color:var(--bad);font-weight:700">Not eligible: ${esc(whyNot(r))}</small>` : ''}${st === 'left' ? `<small style="color:var(--muted);font-weight:700">${esc(r.how || 'Struck through')}</small>` : ''}${r.leftHint ? `<small style="color:var(--mid);font-weight:700">Possible left student: ${esc(hintText(r.leftHint))}</small>` : ''}${!r.struck && !r.enroll ? (() => { const qc = quickCands(r); return qc.length ? `<div class="qc">${qc.map(c => { const p = Math.round(c.sc * 100); return `<button type="button" class="${S.picks[r.row] === c.s.id ? 'on' : ''}" data-qrow="${r.row}" data-qpick="${esc(c.s.id)}"><span class="p ${p >= 90 ? 'hi' : p >= 75 ? 'md' : ''}">${p}%</span><b>${esc(c.s.name)}</b> <small>D/o ${esc(c.s.father)}${c.s.enroll ? ' · ' + esc(c.s.enroll) : ''}${c.s.pcs ? ' · ' + esc(c.s.pcs) : ''}</small></button>`; }).join('')}</div>` : '<small style="color:var(--muted)">No 60%+ student in the list — open her to search.</small>'; })() : ''}</div>${canPrint(r) && !r.dob ? '<span class="tag t-warn">No DOB</span>' : ''}<span class="tag ${t[0]}">${t[1]}</span></div>`;
   }).join('') + (L.length > max ? `<div class="sub">${L.length - max} more — search to narrow.</div>` : '');
   const n = Object.keys(S.picks).length;
   box.insertAdjacentHTML('beforeend', n ? `<div id="qbar"><b style="flex:1">${n} student${n > 1 ? 's' : ''} selected</b><button class="btn sm" id="qClear">Clear</button><button class="btn ok" id="qFill" ${S.busy ? 'disabled' : ''}>${S.busy === 'qfill' ? 'Saving…' : 'Fill ' + n + ' in one go'}</button></div>` : '');
@@ -316,7 +318,7 @@ function certHtml(v){
     ${row([['This is to certify that Miss.', v.name, 70]])}${row([['Daughter of Mr.', v.father, 70]])}${row([['Appeared in the', v.group, 30], ['Examination held in', v.session, 25]])}
     <div style="margin-top:18px;line-height:1.5">${esc(cfg.gazette)}</div><div style="margin-top:14px">Other Particulars are: -</div>
     ${row([['Roll No.', v.roll, 30], ['Registration No.', v.reg, 40]])}${row([['Marks obtained', v.marks, 15], ['out of', v.total, 15], ['Grade/Division', v.grade, 15]])}
-    ${row([['Date of Birth', v.dob, 70]])}${row([['Distinctions Won', v.dist, 70]])}${row([['Conduct and Moral Character', v.conduct, 0]])}
+    ${S.dob ? row([['Date of Birth', v.dob, 70]]) : ''}${row([['Distinctions Won', v.dist, 70]])}${row([['Conduct and Moral Character', v.conduct, 0]])}
     <div style="margin-top:40px;text-align:right"><div style="display:inline-block;width:230px;text-align:center"><div style="height:60px">${A.sign ? `<img src="${A.sign}" style="height:55px">` : ''}</div>${cfg.sign.map(esc).join('<br>')}</div></div>
   </div>`;
 }
@@ -374,14 +376,53 @@ async function saveEd(){
   if(r){ send.name = v.name; send.father = v.father; }
   if(E.pick !== undefined) send.id = E.pick ? E.pick.id : '';
   if(r && Object.keys(send).length === 2 && send.name === r.name && send.father === r.father){ E.msg = 'Nothing changed.'; paintEd(); return; }
+  if(r && !navigator.onLine){ qPut(r, send); return; }
   E.busy = true; E.err = ''; E.msg = ''; paintEd();
   try{
     const x = await api({ action:'pc_save', sheet:S.data.sheet, row:r ? r.row : 0, expect:r ? { name:r.name, father:r.father, roll:r.roll } : null, values:send }, 120000);
     if(x.moved && r) S.data.rows = S.data.rows.filter(z => z.row !== r.row);
     E.r = upsert(x.row); E.v = certVals(E.r); E.pick = undefined; E.msg = 'Saved in the sheet.';
-  }catch(e){ E.err = e.message; }
+  }catch(e){ if(e.net && r){ E.busy = false; qPut(r, send); return; } E.err = e.message; }
   E.busy = false; paintEd(); paintStats();
 }
+/* ---------- v8.56 offline: changes kept on this device, sent to the sheet when the internet is back ---------- */
+const qOf = r => S.data && S.q2.find(q => q.sheet === S.data.sheet && q.row === r.row);
+function qSave(){ ls.set('pc_q', S.q2); }
+function qPut(r, send){
+  const v = Object.assign({}, send); delete v.id;                            // linking a student needs the internet
+  let q = qOf(r);
+  if(q) Object.assign(q.values, v);                                          // a second change to her: one item, first "expect" kept
+  else S.q2.push(q = { sheet:S.data.sheet, row:r.row, expect:{ name:r.name, father:r.father, roll:r.roll }, values:v, who:r.name, at:Date.now() });
+  q.err = ''; qSave();
+  Object.assign(r, v); prep(); findAuto(); dataSave();
+  E.r = r; E.v = certVals(r); E.pick = undefined;
+  E.msg = 'No internet: saved on this device. It goes to the sheet by itself when the internet is back.' + (send.id !== undefined ? ' (Linking a student needs the internet: do it again online.)' : '');
+  paintEd(); paintStats();
+}
+let qBusy = false;
+async function qSync(){
+  if(qBusy || !S.q2.length || !navigator.onLine) return;
+  qBusy = true; let sent = 0;
+  try{
+    for(const q of S.q2.slice()){
+      if(q.err) continue;
+      try{ const x = await api({ action:'pc_save', sheet:q.sheet, row:q.row, expect:q.expect, values:Object.assign({ name:q.values.name || q.expect.name, father:q.values.father || q.expect.father }, q.values) }, 120000);
+        S.q2 = S.q2.filter(z => z !== q); qSave(); sent++;
+        if(S.data && S.data.sheet === q.sheet && x.row) upsert(x.row); }
+      catch(e){ if(e.net) break; q.err = e.message; qSave(); }
+    }
+  } finally { qBusy = false; }
+  if(sent){ S.msg = sent + ' change' + (sent > 1 ? 's' : '') + ' made offline sent to the sheet.'; dataSave(); }
+  if(sent || S.q2.some(q => q.err)) paintStats();
+}
+function qHtml(){
+  if(!S.q2.length) return '';
+  const bad = S.q2.filter(q => q.err);
+  return `<div class="note mid" style="margin-top:10px"><b>${S.q2.length} change${S.q2.length > 1 ? 's' : ''} made offline</b> ${S.q2.length - bad.length ? '· waiting for the internet' : ''} <button class="btn sm" id="qSend" ${navigator.onLine ? '' : 'disabled'}>Send now</button>
+    ${S.q2.map((q, i) => `<div class="sub" style="margin-top:4px">${esc(q.who)} (${esc(q.sheet)}, row ${q.row}): ${esc(Object.keys(q.values).filter(k => k !== 'name' && k !== 'father' || q.values[k] !== q.expect[k]).map(k => k + ' → ' + q.values[k]).join(', ') || 'no change')}${q.err ? ` <b style="color:var(--bad)">Not sent: ${esc(q.err)}</b> <button class="btn sm" data-qretry="${i}">Try again</button> <button class="btn sm red" data-qdrop="${i}">Remove</button>` : ''}</div>`).join('')}</div>`;
+}
+/* the last list read, kept on this device so the page opens without internet */
+function dataSave(){ if(S.data) ls.set('pc_data_' + S.data.sheet, Object.assign({}, S.data, { savedAt:S.data.savedAt || Date.now() })); }
 async function strikeEd(){
   const r = E.r, on = !r.struck;
   if(on && !confirm('Strike through ' + r.name + '? She gets no certificate.')) return;
@@ -411,12 +452,12 @@ const PDFLIB = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'
 const loadJs = src => new Promise((ok, no) => { const x = document.createElement('script'); x.src = src; x.onload = ok; x.onerror = () => no(new Error('Could not load the PDF tool (internet?)')); document.head.appendChild(x); });
 const b64bytes = b => { const bin = atob(b), u = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
 async function pdfFile(){
-  const key = S.data && S.data.sheet + '|' + (S.data.rows || []).length;
+  const key = S.data && S.data.sheet + '|' + (S.data.rows || []).length + '|' + (S.dob ? 'dob' : 'nodob');
   if(S.pdfBlob && S.pdfBlob.key === key) return S.pdfBlob;
   S.busy = 'pdf'; S.err = ''; S.msg = 'Making the PDF…'; render();
   try{
     if(!window.PDFLib) await loadJs(PDFLIB);
-    const N = 40, first = await api({ action:'pc_pdf', sheet:S.data.sheet, rows:[], chunk:1, from:0, n:N }, 360000);
+    const N = 40, first = await api({ action:'pc_pdf', sheet:S.data.sheet, rows:[], chunk:1, from:0, n:N, dob:S.dob }, 360000);
     if(!first.ok) throw new Error(first.error === 'UNKNOWN_ACTION' ? 'Paste the new Certificates.gs and deploy a new version.' : first.error || 'PDF not made');
     if(first.b64 === undefined) throw new Error('The server still has the old Certificates.gs: paste the new one and deploy a new version.');
     const total = first.total, parts = [first], starts = []; for(let f = N; f < total; f += N) starts.push(f);
@@ -424,7 +465,7 @@ async function pdfFile(){
     const say = () => { S.msg = 'Making the PDF: ' + done + ' of ' + total + ' certificates…'; render(); };
     say();
     const worker = async () => { while(starts.length){ const f = starts.shift(); let r, k = 0;
-      for(;;){ try{ r = await api({ action:'pc_pdf', sheet:S.data.sheet, rows:[], chunk:1, from:f, n:N }, 360000); if(r.ok) break; throw new Error(r.error); }catch(e){ if(++k >= 3) throw e; } }
+      for(;;){ try{ r = await api({ action:'pc_pdf', sheet:S.data.sheet, rows:[], chunk:1, from:f, n:N, dob:S.dob }, 360000); if(r.ok) break; throw new Error(r.error); }catch(e){ if(++k >= 3) throw e; } }
       parts.push(r); done += r.n; say(); } };
     await Promise.all([worker(), worker(), worker()]);
     parts.sort((a, b) => a.from - b.from);
@@ -453,23 +494,28 @@ async function pdfAct(kind){
 }
 async function drive(rows){
   S.busy = 'pdf'; S.err = ''; S.pdf = null; render();
-  try{ S.pdf = await api({ action:'pc_pdf', sheet:S.data.sheet, rows:rows ? rows.map(r => r.row) : [] }, 360000); if(S.pdf && !S.pdf.ok){ S.err = S.pdf.error || 'PDF not made'; S.pdf = null; } else if(S.pdf) S.pdf.all = !rows; }catch(e){ S.err = e.message; }
+  try{ S.pdf = await api({ action:'pc_pdf', sheet:S.data.sheet, rows:rows ? rows.map(r => r.row) : [], dob:S.dob }, 360000); if(S.pdf && !S.pdf.ok){ S.err = S.pdf.error || 'PDF not made'; S.pdf = null; } else if(S.pdf) S.pdf.all = !rows; }catch(e){ S.err = e.message; }
   S.busy = ''; render(); return S.pdf;
 }
 
 /* ---------- loading ---------- */
-async function loadSheets(){ try{ const r = await api({ action:'pc_sheets' }, 60000); S.sheets = r.sheets; if(!S.sheet || !r.sheets.includes(S.sheet)) S.sheet = r.sheets[r.sheets.length - 1] || ''; render(); }catch(e){ S.err = e.message; render(); } }
+async function loadSheets(){ if(!navigator.onLine){ S.sheets = ls.get('pc_sheets', null); render(); return; } try{ const r = await api({ action:'pc_sheets' }, 60000); S.sheets = r.sheets; ls.set('pc_sheets', r.sheets); if(!S.sheet || !r.sheets.includes(S.sheet)) S.sheet = r.sheets[r.sheets.length - 1] || ''; render(); }catch(e){ S.err = e.message; render(); } }
 async function run(kind){
   if(!S.sheet) return; ls.set('pc_sheet', S.sheet);
   S.busy = kind; S.err = ''; S.msg = ''; S.pdf = null; render();
+  const cached = ls.get('pc_data_' + S.sheet, null);
+  if(!navigator.onLine && cached){ S.data = cached; prep(); findAuto(); S.busy = ''; S.msg = 'No internet: the copy saved on this device is shown (from ' + new Date(cached.savedAt || Date.now()).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) + '). You can open, change and print certificates; changes are sent when the internet is back.'; render(); return; }
   try{
+    await qSync();                                                         // changes made offline go first
     const d = await api({ action:kind === 'prep' ? 'pc_prepare' : 'pc_load', sheet:S.sheet }, 360000);
-    S.data = d; prep(); findAuto();
+    d.savedAt = Date.now(); S.data = d; prep(); findAuto(); dataSave();
     if(kind === 'load' && d.rows.length && !d.rows.some(r => r.how)){ S.busy = ''; return run('prep'); }   // never prepared yet -> do it now
     if(d.stats){ const s = d.stats; S.msg = `Student lists used: ${esc((s.sheets || []).join(', '))}.<br>Left Students records read: ${s.leftRead || 0}${(s.leftSheets || []).length ? ' (' + esc(s.leftSheets.join(', ')) + ')' : ''}.<br>Done: ${s.jcw} Jinnah College rows · ${s.linked} filled (100% name + father name) · ${s.kept} kept from your earlier choices · ${s.left} left students struck through · ${s.dob} with DOB · ${s.open} not matched 100% · <b>${s.ready} certificates ready</b> · ${s.cells} rows written${s.fast ? ' (fast mode)' : ''}.`; }
-  }catch(e){ S.err = e.message; }
+  }catch(e){ if(e.net && cached){ S.data = cached; prep(); findAuto(); S.msg = 'The server could not be reached: the copy saved on this device is shown.'; } else S.err = e.message; }
   S.busy = ''; render(); assets();
 }
+window.addEventListener('online', () => { qSync(); render(); });
+window.addEventListener('offline', () => render());
 /* ---------- review before saving: 96%+ links and possible left students ---------- */
 function openReview(kind){
   let items;
@@ -534,6 +580,7 @@ document.addEventListener('change', e => {
   if(t.dataset && t.dataset.rpick !== undefined && E && E.review){ const i = Number(t.dataset.rpick); E.items[i].sel = Number(t.value); E.tick.add(i); paintEd(); return; }
   if(t.id === 'cSheet'){ S.sheet = t.value; S.data = null; ls.set('pc_sheet', S.sheet); run('load'); }
   if(t.id === 'cStrength'){ S.strength = t.value.trim(); ls.set('pc_strength', S.strength); }
+  if(t.id === 'cDob'){ S.dob = t.checked; ls.set('pc_dob', S.dob); S.pdfBlob = null; S.pdf = null; if(!S.dob && S.filter === 'nodob') S.filter = 'all'; paintStats(); }
 });
 document.addEventListener('input', e => {
   const t = e.target;
@@ -550,6 +597,9 @@ document.addEventListener('click', async e => {
     const y = window.scrollY; paintList(); window.scrollTo(0, y); return;
   }
   if(t.id === 'qFill'){ quickFill(); return; }
+  if(t.id === 'qSend'){ S.q2.forEach(q => { q.err = ''; }); qSync(); return; }
+  if(t.dataset.qretry !== undefined){ S.q2[+t.dataset.qretry].err = ''; qSave(); qSync(); return; }
+  if(t.dataset.qdrop !== undefined){ if(confirm('Remove this offline change? It will not go to the sheet.')){ S.q2.splice(+t.dataset.qdrop, 1); qSave(); paintStats(); } return; }
   if(t.id === 'qClear'){ S.picks = {}; paintList(); return; }
   if(t.id === 'cPrep') run('prep');
   else if(t.id === 'cLoad') run('load');
@@ -567,7 +617,7 @@ document.addEventListener('click', async e => {
   else if(t.id === 'cNew'){ await assets(); openEd(null); }
   else if(t.id === 'eClose'){ E = null; paintEd(); paintStats(); }
   else if(t.id === 'eSave') saveEd();
-  else if(t.id === 'eStrike') strikeEd();
+  else if(t.id === 'eStrike'){ if(!navigator.onLine){ E.err = 'Strike-through needs the internet.'; paintEd(); } else strikeEd(); }
   else if(t.id === 'ePrint'){ readEd(); await assets(); $('#print').innerHTML = certHtml(E.v); window.print(); }
   else if(t.id === 'eDrive'){ const p = await drive([E.r]); if(p){ E.msg = 'PDF saved in Drive.'; paintEd(); window.open(p.url, '_blank'); } else { E.err = S.err; paintEd(); } }
   else if(t.dataset.link){ readEd(); E.pick = S.byId[t.dataset.link.toUpperCase()] || null; E.msg = ''; paintEd(); }
