@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.2
+// @version      1.3
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
@@ -130,12 +130,17 @@
       else if (o.quota === OPEN) {
         used[OPEN] = used[OPEN] || 0;
         if (!o.late && o.agg !== null && used[OPEN] < cfg.openSub) { used[OPEN]++; k = 'PMS'; }
-        else if (o.subFee) {                                   // paid the subsidized fee but below the Open Quota merit: another quota shown as Open
-          k = 'PMS'; o.flag = 'Paid the subsidized fee (Rs ' + o.feeTotal.toLocaleString('en-US') + ') but her Aggregate ' + (o.agg ?? '-') + ' is below the Open Quota subsidized merit: she must be on another quota. Kept in Pre-Medical (S). Ask her and change the Quota.';
-        }
       }
-      if (k === 'PMS' && o.quota === OPEN && !o.flag && o.feeTotal > Number(cfg.subFee || 60000))
-        notes.push([o.s['Student Name'], o.s['Father Name'], 'Pre-Medical (S)', 'In the subsidized merit but paid the self-finance fee (Rs ' + o.feeTotal.toLocaleString('en-US') + '): refund / adjust the fee.']);
+      // the fee she paid decides (every quota): subsidized fee -> (S); in (S) but paid the self-finance fee -> stays, flagged
+      const rs = n => 'Rs ' + n.toLocaleString('en-US');
+      if (k !== 'PMS' && o.subFee) {
+        k = 'PMS'; o.flag = 'yellow';
+        o.why = o.quota === OPEN ? 'Paid the subsidized fee (' + rs(o.feeTotal) + ') but her Aggregate ' + (o.agg ?? '-') + ' is below the Open Quota subsidized merit: she must be on another quota. Kept in Pre-Medical (S). Ask her and change the Quota.'
+          : 'Paid the subsidized fee (' + rs(o.feeTotal) + ') but ' + o.quota + ' has no subsidized seat left for her (or she paid late): kept in Pre-Medical (S). Check her quota and seat.';
+      } else if (k === 'PMS' && o.feeTotal > Number(cfg.subFee || 60000)) {
+        o.flag = 'orange';
+        o.why = 'On a subsidized seat (' + o.quota + (o.agg !== null ? ', Aggregate ' + o.agg : '') + ') but paid the self-finance fee (' + rs(o.feeTotal) + '). Check her quota, or refund / adjust the fee.';
+      }
       if (k === 'PMM' && o.late && cfg.evening) k = 'PME';
       sheetOf.set(o, k);
     });
@@ -160,7 +165,7 @@
         seats.push([sh.name, q, byQ[q].length, lim == null ? '-' : lim, G.length ? G[0].agg : '', G.length ? G[G.length - 1].agg : '']);   // G is by Aggregate: first = highest
       });
       marks[sh.name] = [];
-      L.forEach((o, i) => { if (o.flag) { marks[sh.name].push(i); notes.push([o.s['Student Name'], o.s['Father Name'], sh.name + ' · row ' + (i + 2), o.flag]); } });
+      L.forEach((o, i) => { if (o.flag) { marks[sh.name].push([i, o.flag === 'orange' ? 'F8CBAD' : 'FFFF00']); notes.push([o.s['Student Name'], o.s['Father Name'], sh.name + ' · row ' + (i + 2) + ' · ' + o.quota, o.why]); } });
       out[sh.name] = L.map((o, i) => {
         const s = o.s, sec = sh.sections[i % sh.sections.length], roll = 'JCW-F' + cfg.year + '-' + (sh.roll[0] + i);
         let subs = []; for (let k = 1; k <= 7; k++) subs.push(sp(s['sub' + k + ' 1st year']).toUpperCase());
@@ -175,7 +180,7 @@
             sp(s['Challan Details']), sp(s['Student Id']), o.agewise || '', sp(s['Fee Paid Date']), '', o.late ? 'Late admission (fee after ' + cfg.lastDate + ')' : '']);
       });
     });
-    return { sheets: out, notes, seats, marks };   // marks: rows (0 = first student) whose Quota cell is highlighted
+    return { sheets: out, notes, seats, marks };   // marks: [row (0 = first student), colour] whose Quota cell is highlighted
   }
 /*ENGINE-END*/
 
@@ -435,7 +440,7 @@
         const ws = XLSX.utils.aoa_to_sheet([TRANSFORM_HEAD].concat(res.sheets[name]));
         ws['!cols'] = TRANSFORM_HEAD.map((h, k) => ({ wch: [2, 3, 14, 26].includes(k) ? 24 : k === 4 ? 34 : 12 }));
         const qc = TRANSFORM_HEAD.indexOf('Quota');
-        (res.marks[name] || []).forEach(i => { const a = XLSX.utils.encode_cell({ r: i + 1, c: qc }); if (ws[a]) ws[a].s = { fill: { patternType: 'solid', fgColor: { rgb: 'FFFF00' } }, font: { bold: true, color: { rgb: 'C00000' } } }; });
+        (res.marks[name] || []).forEach(([i, rgb]) => { const a = XLSX.utils.encode_cell({ r: i + 1, c: qc }); if (ws[a]) ws[a].s = { fill: { patternType: 'solid', fgColor: { rgb } }, font: { bold: true, color: { rgb: 'C00000' } } }; });
         XLSX.utils.book_append_sheet(wb, ws, name); counts.push(name + ' ' + res.sheets[name].length);
       });
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res.seats), 'Seats & merit');
