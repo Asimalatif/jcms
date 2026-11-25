@@ -1427,7 +1427,7 @@ async function signOut(msg){
     else toast('Saved in sheet. Signed out.');
   }
   user = ''; pass = ''; store.set('user', ''); store.set('pass', ''); store.set('cts', null); store.set('lvOp', false);   // private contacts never stay after sign-out
-  if(!msg){ queue = []; data = {}; sheets = []; teacher = ''; isAdmin = false; confirms = {}; ['queue','data','sheets','confirms'].forEach(k => store.set(k, k === 'queue' || k === 'sheets' ? [] : {})); store.set('teacher', ''); store.set('admin', false); setSvc([]);
+  if(!msg){ queue = []; data = {}; sheets = []; teacher = ''; isAdmin = false; confirms = {}; ['queue','data','sheets','confirms'].forEach(k => store.set(k, k === 'queue' || k === 'sheets' ? [] : {})); store.set('teacher', ''); store.set('admin', false); store.set('pvd', []); setSvc([]);
     rq = []; store.set('rq', []); myReports = []; store.set('myrep', []); cps = []; store.set('cps', []); }
   renderLogin(msg);
 }
@@ -3572,6 +3572,7 @@ function renderHome(){
   if(cur.length || scope) h += examsCard(cur);
   if(isAdmin || store.get('lvOp', false)) h += leaveCard();
   if(!isAdmin && svc && svc.length) h += svcCard();
+  h += pvCard();
   h += searchCard();
 
   if(cur.length){
@@ -3613,6 +3614,12 @@ function lowRow(x){
 const SVC_PAGES = { admission:['Admissions', 'admission.html'], idcards:['Student ID (chest) cards', 'idcards.html'], certificates:['Provisional certificates', 'certificates.html'],
   board:['Board results', 'board.html'], duties:['Exam duty lists', 'duties.html'], collegereports:['College reports', 'reports.html'], shortage:['Attendance shortage', 'shortage.html'],
   leaves:['Approved leaves', 'leaves.html'], recordsummary:['Marked-Missed entries', 'recordsummary.html'], admintools:['Admin tools', 'admintools.html'], physical:['Physical verification', 'physical.html'] };
+/* physical verification duty of this login (PhysicalVerification.gs → whoami.pvd): her team's area, filled in on physical.html */
+function pvCard(){
+  const L = store.get('pvd', []); if(!Array.isArray(L) || !L.length) return '';
+  return `<section class="card"><h3>${I.check} Physical verification duty</h3><div class="sub">You are in the verification team of ${L.map(x => `<b>${esc(x.area)}</b> (${esc(x.status)})`).join(', ')}. Check the stock list, change any value in the table, add or remove items, then submit it to the admin.</div>
+    <div class="acts2"><a class="btn primary" href="physical.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open my verification</a></div></section>`;
+}
 function svcCard(){
   const L = svc.filter(k => SVC_PAGES[k] && !(k === 'leaves' && store.get('lvOp', false)));
   if(!L.length) return '';
@@ -7075,6 +7082,7 @@ async function checkScope(){
       const ttChanged = setTT(r);
       if(!!r.cp !== isCP){ isCP = !!r.cp; store.set('isCP', isCP); if(appView !== 'att') rerender(); }
       if(!!r.ttm !== isTTM){ isTTM = !!r.ttm; store.set('isTTM', isTTM); if(appView !== 'att') rerender(); }
+      if(Array.isArray(r.pvd)){ const ch = JSON.stringify(r.pvd) !== JSON.stringify(store.get('pvd', [])); store.set('pvd', r.pvd); if(ch && appView !== 'att') rerender(); }   // physical verification duty
       if(r.svc && setSvc(r.svc)){ if(appView === 'att' && svcHid('att')) appView = 'home'; if(appView !== 'att') rerender(); }
       if(ttChanged){ if(appView === 'att') renderMain(); else rerender(); }
       const was = scope; scope = r.view || ''; store.set('scope', scope);

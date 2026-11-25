@@ -63,6 +63,7 @@ tr.sel td{background:var(--mid-bg)!important}
 .empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
 .note{font-size:12.5px;color:var(--muted);background:var(--surface);border:1.5px dashed var(--line);border-radius:12px;padding:9px 12px;margin-bottom:12px;line-height:1.55}
 .hidden{display:none!important}
+body.teamv .adm{display:none!important}
 .team{white-space:pre-line;font-size:12.5px;min-width:170px}
 .docs a{display:inline-block;margin:1px 3px;font-size:12px;color:var(--brown2);font-weight:700}
 .rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
@@ -84,6 +85,15 @@ dialog h3{margin:0 0 10px}
 .selbar{position:sticky;bottom:10px;z-index:5;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--ink);color:var(--surface);padding:10px 12px;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-top:10px}
 .selbar .btn{height:34px;color:var(--ink);background:var(--surface)}.selbar .btn.no{color:var(--neg)}.selbar .btn.ok{color:var(--pos)}
 .pill{font-size:11.5px;color:var(--muted)}
+.ie{width:100%;min-width:44px;border:1px solid transparent;border-radius:6px;background:transparent;padding:3px 4px;text-align:inherit;font:inherit;color:inherit}
+.ie:hover{border-color:var(--line)}.ie:focus{outline:none;border-color:var(--brown2);background:var(--surface)}
+textarea.ie{resize:vertical;min-height:28px;line-height:1.35}
+td.c .ie{text-align:center}td .ie.b{font-weight:800}td .ie.red{color:var(--neg);font-weight:800}
+select.ie{min-width:90px;padding:3px 2px}
+tr.saving td:first-child{box-shadow:inset 4px 0 var(--mid)}tr.saved td:first-child{box-shadow:inset 4px 0 var(--pos)}tr.failed td:first-child{box-shadow:inset 4px 0 var(--neg)}
+.chip{display:inline-block;border-radius:20px;padding:2px 8px;font-size:11.5px;font-weight:700;background:var(--surface2);border:1px solid var(--line);margin:1px}
+.chip.no{background:var(--mid-bg);color:var(--mid)}
+.files td{font-size:12.5px}.files select{height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);max-width:220px}
 @media(max-width:640px){.fg{grid-template-columns:1fr}.hide-sm{display:none}}
 @media print{header,.tabs,.bar,.note,.selbar{display:none!important}.sec,.kpi{box-shadow:none;break-inside:avoid}body{background:#fff}}
 </style>
@@ -108,12 +118,14 @@ dialog h3{margin:0 0 10px}
   <!-- TEAMS & STATUS -->
   <div id="v_status">
     <div id="seedBox"></div>
+    <div id="driveBox"></div>
     <div id="k_status" class="kpis"></div>
-    <div class="bar">
+    <div class="bar adm">
       <select id="stF" onchange="drawStatus()"><option value="">All areas</option><option>Pending</option><option>Received</option><option>Returned for correction</option></select>
       <input id="stQ" class="grow" placeholder="Search area or team member…" oninput="drawStatus()">
-      <button class="btn p" onclick="areaDlg()">+ Area / lab</button>
-      <button class="btn" onclick="sessionDlg()">New session</button>
+      <button class="btn p adm" onclick="areaDlg()">+ Area / lab</button>
+      <button class="btn adm" onclick="matchLogins()" title="Find each team member's app login from the names">Match logins</button>
+      <button class="btn adm" onclick="sessionDlg()">New session</button>
     </div>
     <div id="o_status"></div>
   </div>
@@ -133,6 +145,7 @@ dialog h3{margin:0 0 10px}
       <button class="btn p" onclick="itemDlg()">+ Add item</button>
       <button class="btn" onclick="pasteDlg()">+ Add many (paste)</button>
       <button class="btn" id="selBtn" onclick="toggleSel()">Select</button>
+      <span class="pill">Tap any value in the table to change it; it saves by itself.</span>
       <span class="sp" style="flex:1"></span>
       <button class="btn" onclick="rep('register', $('aF').value)">PDF of this list</button>
     </div>
@@ -197,7 +210,7 @@ function remainOf(t, u, f){ const T = num(t); if (T === null) return ''; return 
 const fmt = n => n == null ? '' : (Math.round(n * 100) / 100).toLocaleString('en-US');
 
 /* ---------- data ---------- */
-const AK = ['id', 'ses', 'sno', 'name', 'team', 'status', 'recv', 'docs', 'rem', 'by', 'at'];
+const AK = ['id', 'ses', 'sno', 'name', 'team', 'status', 'recv', 'docs', 'rem', 'by', 'at', 'logins'];
 const IK = ['id', 'ses', 'area', 'loc', 'cat', 'name', 'reg', 'total', 'used', 'faulty', 'remain', 'unit', 'cond', 'rem', 'state', 'remOn', 'remBy', 'why', 'addBy', 'addOn', 'upBy', 'upAt'];
 const obj = (keys, r) => { const o = {}; keys.forEach((k, i) => o[k] = r[i] == null ? '' : String(r[i])); return o; };
 const areaOf = id => D.areas.find(a => a.id === id) || { name: '?', team: '' };
@@ -213,13 +226,15 @@ async function load(session){
   say('busy', 'Reading the physical verification lists…');
   try{
     const r = await api({ action: 'pv_load', session: session || '' });
-    D = { session: r.session, current: r.current, sessions: r.sessions, book: r.book, seedReady: r.seedReady, seedSession: r.seedSession,
+    D = { session: r.session, current: r.current, sessions: r.sessions, book: r.book, seedReady: r.seedReady, seedSession: r.seedSession, role: r.role || 'admin', year: r.year || '', users: r.users || [], drive: null,
           areas: r.areas.map(x => obj(AK, x)), items: r.items.map(x => obj(IK, x)) };
     LOG = null;
     $('ses').innerHTML = D.sessions.map(s => '<option' + (s === D.session ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
-    $('scope').textContent = 'Session ' + D.session + (D.session === D.current ? ' (current)' : '') + ' · ' + D.areas.length + ' areas · ' + D.items.filter(i => i.state !== 'Removed').length + ' items';
+    document.body.classList.toggle('teamv', D.role === 'team');
+    $('scope').textContent = (D.role === 'team' ? 'My duty · ' : '') + 'Session ' + D.session + (D.session === D.current ? ' (current)' : '') + ' · ' + D.areas.length + ' areas · ' + D.items.filter(i => i.state !== 'Removed').length + ' items';
     if (D.book) { $('bookLink').href = D.book; $('bookLink').style.display = ''; }
     hush(); fillFilters(); draw();
+    if (D.role === 'admin' && D.session) loadDrive(false);
   }catch(e){ say('err', e.message); }
 }
 function draw(){ if (!D) return; if (MODE === 'status') drawStatus(); else if (MODE === 'stock') drawStock(); else if (MODE === 'reports') drawReports(); else drawLog(); }
@@ -231,28 +246,113 @@ function tab(w){
 /* ---------------- TEAMS & STATUS ---------------- */
 function drawStatus(){
   if (!D) return;
-  const A = sortAreas(D.areas), rec = A.filter(a => a.status === 'Received').length, act = D.items.filter(i => i.state !== 'Removed');
-  $('seedBox').innerHTML = D.seedReady ? '<div class="sec"><h3><span>Start with the lists already in Drive</span></h3><div class="sub">The folder <b>Physical verification / 2026</b> has the status sheet and every team\'s document for <b>' + esc(D.seedSession) +
+  const A = sortAreas(D.areas), rec = A.filter(a => a.status === 'Received').length, act = D.items.filter(i => i.state !== 'Removed'), admin = D.role !== 'team';
+  $('seedBox').innerHTML = admin && D.seedReady ? '<div class="sec"><h3><span>Start with the lists already in Drive</span></h3><div class="sub">The folder <b>Physical verification / 2026</b> has the status sheet and every team\'s document for <b>' + esc(D.seedSession) +
     '</b> (11 areas, about 1,100 items: labs, library, exam stationery, sick room, college furniture room by room, computer equipment). Load them once, then add, change or remove items here.<div style="margin-top:10px"><button class="btn p" onclick="seed()">Load the ' + esc(D.seedSession) + ' lists</button></div></div></div>' : '';
-  $('k_status').innerHTML =
+  if (!admin) $('driveBox').innerHTML = '';
+  $('k_status').innerHTML = admin ?
     '<div class="kpi"><b>' + A.length + '</b><span>areas / labs</span></div>' +
     '<div class="kpi pos"><b>' + rec + '</b><span>verification received</span></div>' +
     '<div class="kpi mid"><b>' + (A.length - rec) + '</b><span>pending</span></div>' +
     '<div class="kpi"><b>' + act.length.toLocaleString() + '</b><span>items in the lists</span></div>' +
     '<div class="kpi neg"><b>' + act.filter(i => itemKind(i) === 'bad').length + '</b><span>broken / missing / out of order</span></div>' +
-    '<div class="kpi"><b>' + D.items.filter(i => i.state === 'Removed').length + '</b><span>removed (written off)</span></div>';
+    '<div class="kpi"><b>' + D.items.filter(i => i.state === 'Removed').length + '</b><span>removed (written off)</span></div>' : '';
+  if (!admin) {
+    $('o_status').innerHTML = '<div class="note">This is your physical verification duty for <b>' + esc(D.session) + '</b>. Open <b>Stock lists</b> to check every item: change any number straight in the table, add what is new and remove what is written off. When your list is complete, tap <b>Submit to admin</b>.</div>' +
+      A.map(a => { const s = areaStats(a);
+        return '<div class="sec"><h3><span>' + esc(a.name) + '</span><span class="tag ' + esc(a.status.split(' ')[0]) + '">' + esc(a.status) + (a.recv ? ' · ' + esc(a.recv) : '') + '</span></h3><div class="sub"><b>Team:</b> ' + esc(a.team.replace(/\n/g, ', ')) +
+          (a.rem ? '<br>' + esc(a.rem) : '') + '<div class="kpis" style="margin:10px 0 0"><div class="kpi"><b>' + s.items + '</b><span>items</span></div><div class="kpi neg"><b>' + s.bad + '</b><span>broken / missing</span></div><div class="kpi"><b>' + s.removed + '</b><span>removed</span></div><div class="kpi"><b>' + s.locs + '</b><span>places</span></div></div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn p" onclick="openArea(\'' + a.id + '\')">Open my stock list</button><button class="btn" onclick="rep(\'register\', \'' + a.id + '\')">Stock register PDF</button>' +
+          '<button class="btn ' + (a.status === 'Received' ? '' : 'ok') + '" onclick="submitArea(\'' + a.id + '\')">' + (a.status === 'Received' ? 'Submit again' : 'Submit to admin') + '</button></div></div></div>'; }).join('');
+    return;
+  }
   const f = $('stF').value, q = $('stQ').value.trim().toLowerCase();
   const L = A.filter(a => (!f || a.status === f) && (!q || (a.name + ' ' + a.team + ' ' + a.rem).toLowerCase().includes(q)));
   if (!A.length) { $('o_status').innerHTML = '<div class="empty"><b>No areas in ' + esc(D.session) + '</b>Tap <i>+ Area / lab</i> to add one, or <i>New session</i> to copy last session\'s areas and stock.</div>'; return; }
-  $('o_status').innerHTML = '<div class="sec"><h3><span>Duty list of physical verification · session ' + esc(D.session) + '</span><span class="pill">' + L.length + ' of ' + A.length + '</span></h3><div class="scroll"><table><thead><tr><th>S.No</th><th>Area / Lab</th><th>Team</th><th>Status</th><th>Received on</th><th>Items</th><th>Broken / missing</th><th>Documents</th><th></th></tr></thead><tbody>' +
-    L.map(a => { const s = areaStats(a), docs = a.docs.split(/\s*\n\s*/).filter(Boolean);
-      return '<tr><td>' + esc(a.sno) + '</td><td class="l"><b>' + esc(a.name) + '</b>' + (a.rem ? '<div class="pill">' + esc(a.rem) + '</div>' : '') + '</td><td class="l team">' + esc(a.team) + '</td>' +
-        '<td><select onchange="quickStatus(\'' + a.id + '\', this.value)" style="height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface)">' +
-        ['Pending', 'Received', 'Returned for correction'].map(x => '<option' + (x === a.status ? ' selected' : '') + '>' + x + '</option>').join('') + '</select></td>' +
-        '<td>' + esc(a.recv) + '</td><td><a href="#" onclick="openArea(\'' + a.id + '\');return false"><b>' + s.items + '</b></a>' + (s.locs > 1 ? '<div class="pill">' + s.locs + ' places</div>' : '') + '</td>' +
+  const uname = u => { const x = D.users.find(v => v[1].toLowerCase() === u.toLowerCase()); return x ? x[0] : u; };
+  $('o_status').innerHTML = '<div class="sec"><h3><span>Duty list of physical verification · session ' + esc(D.session) + '</span><span class="pill">' + L.length + ' of ' + A.length + ' · tap a value to change it</span></h3><div class="scroll"><table id="areaTbl"><thead><tr><th>S.No</th><th>Area / Lab</th><th>Team</th><th>App logins</th><th>Status</th><th>Received on</th><th>Items</th><th>Broken / missing</th><th>Documents</th><th></th></tr></thead><tbody>' +
+    L.map(a => { const s = areaStats(a), docs = a.docs.split(/\s*\n\s*/).filter(Boolean), lg = a.logins.split(/[,\s]+/).filter(Boolean);
+      return '<tr data-aid="' + a.id + '"><td style="width:54px"><input class="ie" data-af="sno" value="' + esc(a.sno) + '" style="text-align:center"></td>' +
+        '<td class="l" style="min-width:190px"><input class="ie" data-af="name" value="' + esc(a.name) + '" style="font-weight:800"><textarea class="ie pill" data-af="rem" rows="1" placeholder="remarks…">' + esc(a.rem) + '</textarea></td>' +
+        '<td class="l" style="min-width:170px"><textarea class="ie" data-af="team" rows="' + Math.max(2, a.team.split('\n').length) + '" style="font-size:12.5px">' + esc(a.team) + '</textarea></td>' +
+        '<td class="l" style="min-width:130px">' + (lg.length ? lg.map(u => '<span class="chip">' + esc(uname(u)) + '</span>').join('') : '<span class="chip no">none</span>') + ' <a href="#" onclick="loginsDlg(\'' + a.id + '\');return false" class="pill">change</a></td>' +
+        '<td><select class="ie" data-af="status" style="min-width:120px">' + ['Pending', 'Received', 'Returned for correction'].map(x => '<option' + (x === a.status ? ' selected' : '') + '>' + x + '</option>').join('') + '</select></td>' +
+        '<td><input class="ie" type="date" data-af="recv" value="' + toIso(a.recv) + '" style="min-width:120px"></td><td><a href="#" onclick="openArea(\'' + a.id + '\');return false"><b>' + s.items + '</b></a>' + (s.locs > 1 ? '<div class="pill">' + s.locs + ' places</div>' : '') + '</td>' +
         '<td>' + (s.bad ? '<span class="tag bad">' + s.bad + '</span>' : '–') + '</td>' +
         '<td class="docs">' + (docs.length ? docs.map((u, i) => '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + (docs.length > 1 ? 'Doc ' + (i + 1) : 'Open') + '</a>').join('') : '<span class="pill">—</span>') + '</td>' +
-        '<td><button class="btn sm" onclick="areaDlg(\'' + a.id + '\')">Edit</button></td></tr>'; }).join('') + '</tbody></table></div></div>';
+        '<td><button class="btn sm" onclick="areaDlg(\'' + a.id + '\')" title="Documents, delete">⋯</button></td></tr>'; }).join('') + '</tbody></table></div></div>';
+}
+/* ---------- instant edit of an area row ---------- */
+const ATIMER = {};
+function areaField(el){
+  const tr = el.closest('tr[data-aid]'); if (!tr) return;
+  const id = tr.dataset.aid; clearTimeout(ATIMER[id]); tr.className = 'saving';
+  ATIMER[id] = setTimeout(() => areaPush(id, tr), el.tagName === 'SELECT' || el.type === 'date' ? 0 : 900);
+}
+async function areaPush(id, tr){
+  const a = D.areas.find(x => x.id === id); if (!a) return;
+  const v = k => { const el = tr.querySelector('[data-af="' + k + '"]'); return el ? el.value : ''; };
+  const status = v('status'), recv = status === 'Pending' ? '' : fromIso(v('recv'));
+  const area = { id, session: a.ses, sno: v('sno'), name: v('name'), team: v('team'), status, recv, docs: a.docs, remarks: v('rem'), logins: a.team === v('team') ? a.logins : null };
+  try{
+    const r = await api({ action: 'pv_area_save', area }), o = obj(AK, r.area), teamCh = a.team !== o.team || a.status !== o.status;
+    Object.assign(a, o); tr.className = 'saved'; setTimeout(() => { if (tr.className === 'saved') tr.className = ''; }, 1500);
+    if (teamCh || o.recv !== recv) drawStatus();
+  }catch(e){ tr.className = 'failed'; say('err', a.name + ': ' + e.message); }
+}
+function loginsDlg(id){
+  const a = D.areas.find(x => x.id === id), cur = new Set(a.logins.split(/[,\s]+/).filter(Boolean).map(x => x.toLowerCase()));
+  $('dlgIn').innerHTML = '<h3>App logins of ' + esc(a.name) + '</h3><div class="note" style="margin:0 0 10px">The ticked teachers see this duty on their home screen and can fill in this area\'s stock list from their own login.<br><b>Team:</b> ' + esc(a.team.replace(/\n/g, ', ')) + '</div>' +
+    '<input id="lgQ" placeholder="Search a teacher…" style="width:100%;height:40px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;margin-bottom:8px" oninput="lgFilter()">' +
+    '<div id="lgList" style="max-height:46vh;overflow:auto;border:1.5px solid var(--line);border-radius:10px;padding:6px">' +
+    D.users.slice().sort((x, y) => (cur.has(y[1].toLowerCase()) - cur.has(x[1].toLowerCase())) || x[0].localeCompare(y[0])).map(u => '<label style="display:flex;gap:8px;align-items:center;padding:5px 4px;border-bottom:1px solid var(--line)" data-t="' + esc((u[0] + ' ' + u[1]).toLowerCase()) + '"><input type="checkbox" value="' + esc(u[1]) + '"' + (cur.has(u[1].toLowerCase()) ? ' checked' : '') + '> <b>' + esc(u[0]) + '</b> <span class="pill">' + esc(u[1]) + '</span></label>').join('') +
+    '</div><div class="dacts"><button class="btn" onclick="$(\'dlg\').close()">Cancel</button><button class="btn p" id="lgGo">Save</button></div>';
+  $('dlg').showModal();
+  $('lgGo').onclick = async () => {
+    const logins = [...$('lgList').querySelectorAll('input:checked')].map(x => x.value);
+    try{ const r = await api({ action: 'pv_area_save', area: { id, session: a.ses, sno: a.sno, name: a.name, team: a.team, status: a.status, recv: a.recv, docs: a.docs, remarks: a.rem, logins } }); Object.assign(a, obj(AK, r.area)); $('dlg').close(); say('ok', a.name + ': ' + logins.length + ' login(s).'); drawStatus(); }
+    catch(e){ alert(e.message); }
+  };
+}
+function lgFilter(){ const q = $('lgQ').value.trim().toLowerCase(); $('lgList').querySelectorAll('label').forEach(l => l.style.display = !q || l.dataset.t.includes(q) ? '' : 'none'); }
+async function matchLogins(){
+  const empty = D.areas.filter(a => !a.logins).length, force = !empty || confirm('Find logins for all ' + D.areas.length + ' areas again from the team names? (Cancel = only the ' + empty + ' areas without logins)');
+  say('busy', 'Matching team names with the app logins…');
+  try{ const r = await api({ action: 'pv_match', session: D.session, force }); r.areas.forEach(x => { const o = obj(AK, x), a = D.areas.find(y => y.id === o.id); if (a) Object.assign(a, o); }); say('ok', r.changed + ' area(s) updated. Check names that show "none" and set them with "change".'); drawStatus(); }
+  catch(e){ say('err', e.message); }
+}
+async function submitArea(id){
+  const a = D.areas.find(x => x.id === id), note = prompt('Submit the physical verification of ' + a.name + ' to the admin?\nA note for the admin (optional):', '');
+  if (note === null) return;
+  try{ const r = await api({ action: 'pv_submit', id, note, session: D.session }); Object.assign(a, obj(AK, r.area)); say('ok', 'Submitted. The admin sees ' + a.name + ' as received.'); drawStatus(); }
+  catch(e){ say('err', e.message); }
+}
+/* ---------- the year's Drive folder (2025-26 → folder 2026, 2026-27 → folder 2027) ---------- */
+async function loadDrive(create){
+  $('driveBox').innerHTML = '<div class="note">Looking in the Drive folder ' + esc(D.year) + '…</div>';
+  try{ D.drive = await api({ action: 'pv_drive', session: D.session, create: !!create }); drawDrive(); }
+  catch(e){ $('driveBox').innerHTML = '<div class="note" style="color:var(--neg)">Drive folder: ' + esc(e.message) + '</div>'; }
+}
+function drawDrive(){
+  const d = D.drive; if (!d || D.role === 'team') { $('driveBox').innerHTML = ''; return; }
+  if (!d.folder) { $('driveBox').innerHTML = '<div class="sec"><h3><span>Drive folder ' + esc(d.year) + '</span></h3><div class="sub">There is no folder <b>' + esc(d.year) + '</b> in <a href="' + esc(d.root) + '" target="_blank" rel="noopener">Physical verification</a> yet. Teams put their documents for ' + esc(D.session) + ' there.<div style="margin-top:8px"><button class="btn p" onclick="loadDrive(true)">Make folder ' + esc(d.year) + '</button></div></div></div>'; return; }
+  const nm = id => (D.areas.find(a => a.id === id) || {}).name || '', fresh = d.files.filter(f => !f.linked), sug = fresh.filter(f => f.guess);
+  const opts = sel => '<option value="">— not an area document —</option>' + sortAreas(D.areas).map(a => '<option value="' + a.id + '"' + (a.id === sel ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
+  $('driveBox').innerHTML = '<div class="sec"><h3><span>Drive folder ' + esc(d.folder.name) + ' · ' + d.files.length + ' document(s)' + (fresh.length ? ' · <span style="color:var(--mid)">' + fresh.length + ' not linked</span>' : '') + '</span><span style="display:flex;gap:6px;flex-wrap:wrap">' +
+    '<a class="btn sm" href="' + esc(d.folder.url) + '" target="_blank" rel="noopener">Open folder</a><button class="btn sm" onclick="loadDrive(false)">Check again</button>' + (sug.length ? '<button class="btn sm p" onclick="linkDocs(true)">Link ' + sug.length + ' suggested</button>' : '') + '<button class="btn sm" onclick="this.closest(\'.sec\').querySelector(\'.scroll\').classList.toggle(\'hidden\')">Show / hide</button></span></h3>' +
+    '<div class="scroll' + (fresh.length ? '' : ' hidden') + '"><table class="files"><thead><tr><th>Document</th><th>Added</th><th>Area</th><th></th></tr></thead><tbody>' +
+    d.files.map((f, i) => '<tr><td class="l"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">' + esc(f.name) + '</a></td><td>' + esc(f.created) + '</td>' +
+      (f.linked ? '<td class="l"><span class="tag Received">' + esc(nm(f.linked)) + '</span></td><td></td>' : '<td><select id="dv_' + i + '">' + opts(f.guess) + '</select></td><td><button class="btn sm" onclick="linkDocs(false,' + i + ')">Link</button></td>') + '</tr>').join('') +
+    '</tbody></table><div class="pill" style="padding:8px 12px">Linking a document adds it to the area\'s documents and marks a pending area as <b>Received</b> on the document\'s date. Each year make a new folder (2027, 2028 …): <b>New session</b> makes it for you.</div></div></div>';
+}
+async function linkDocs(all, i){
+  const d = D.drive, L = all ? d.files.map((f, k) => ({ f, area: ($('dv_' + k) || {}).value || '' })).filter(x => !x.f.linked && x.area) : [{ f: d.files[i], area: $('dv_' + i).value }];
+  if (!L.length || !L[0].area) { alert('Choose the area first.'); return; }
+  try{
+    const r = await api({ action: 'pv_drive_link', session: D.session, links: L.map(x => ({ url: x.f.url, area: x.area, created: x.f.created, name: x.f.name })) });
+    r.areas.forEach(x => { const o = obj(AK, x), a = D.areas.find(y => y.id === o.id); if (a) Object.assign(a, o); });
+    L.forEach(x => x.f.linked = x.area); say('ok', r.linked + ' document(s) linked.'); drawDrive(); drawStatus();
+  }catch(e){ say('err', e.message); }
 }
 function openArea(id){ tab('stock'); $('aF').value = id; fillLocs(); PAGE = 1; drawStock(); }
 async function quickStatus(id, st){
@@ -293,7 +393,7 @@ async function areaDel(id){
 }
 function nextSes(s){ const m = String(s).match(/^(\d{4})-(\d{2})$/); return m ? (Number(m[1]) + 1) + '-' + String(Number(m[1]) + 2).slice(2) : ''; }
 function sessionDlg(){
-  $('dlgIn').innerHTML = '<h3>New session</h3><div class="note" style="margin:0 0 10px">The same areas and teams are copied with status <b>Pending</b>. With the box ticked every active item comes too, and what was <b>remaining</b> at the end of ' + esc(D.session) +
+  $('dlgIn').innerHTML = '<h3>New session</h3><div class="note" style="margin:0 0 10px">The same areas, teams and logins are copied with status <b>Pending</b>, and the Drive folder for the new year (e.g. 2027) is made inside <i>Physical verification</i>. With the box ticked every active item comes too, and what was <b>remaining</b> at the end of ' + esc(D.session) +
     ' becomes the new <b>total</b> (items used up or finished are left out). ' + esc(D.session) + ' stays as it is.</div><div class="fg">' +
     '<label>Copy from<select id="f_from">' + D.sessions.map(s => '<option' + (s === D.session ? ' selected' : '') + '>' + esc(s) + '</option>').join('') + '</select></label>' +
     '<label>New session<input id="f_to" value="' + esc(nextSes(D.session)) + '" placeholder="2026-27"></label>' +
@@ -305,7 +405,7 @@ async function sessionNew(){
   const from = $('f_from').value, to = $('f_to').value.trim(), copyItems = $('f_copy').checked;
   if (!confirm('Make session ' + to + ' from ' + from + (copyItems ? ' with its stock' : '') + '?')) return;
   $('dlg').close(); say('busy', 'Making session ' + to + '…');
-  try{ const r = await api({ action: 'pv_session_new', from, to, copyItems }); say('ok', 'Session ' + to + ': ' + r.areas + ' areas, ' + r.items + ' items.'); load(to); }
+  try{ const r = await api({ action: 'pv_session_new', from, to, copyItems }); say('ok', 'Session ' + to + ': ' + r.areas + ' areas, ' + r.items + ' items' + (r.folder ? ', Drive folder ' + r.year + ' made' : '') + '.'); load(to); }
   catch(e){ say('err', e.message); }
 }
 async function seed(){
@@ -357,14 +457,18 @@ function condTag(i){
   if (!i.cond) return (num(i.faulty) || 0) > 0 ? '<span class="tag bad">Broken / missing</span>' : '';
   return '<span class="tag ' + (BAD.test(i.cond) ? 'bad' : USED.test(i.cond) ? 'used' : 'gone') + '">' + esc(i.cond) + '</span>';
 }
-function drawStock(){
-  if (!D) return;
-  const rows = stockRows(), act = rows.filter(i => i.state !== 'Removed');
+function stockKpis(rows){
+  const act = rows.filter(i => i.state !== 'Removed');
   const sumT = act.reduce((s, i) => s + (num(i.total) || 0), 0), bad = act.filter(i => itemKind(i) === 'bad');
   $('k_stock').innerHTML = '<div class="kpi"><b>' + rows.length.toLocaleString() + '</b><span>rows shown</span></div>' +
     '<div class="kpi"><b>' + fmt(sumT) + '</b><span>total pieces (numbers only)</span></div>' +
     '<div class="kpi neg"><b>' + bad.length + '</b><span>rows with broken / missing</span></div>' +
     '<div class="kpi neg"><b>' + fmt(act.reduce((s, i) => s + (num(i.faulty) || 0), 0)) + '</b><span>pieces broken / missing</span></div>';
+}
+function drawStock(){
+  if (!D) return;
+  const rows = stockRows();
+  stockKpis(rows);
   if (!D.areas.length) { $('o_stock').innerHTML = '<div class="empty"><b>No areas yet</b>Add an area on the Teams &amp; status tab first.</div>'; return; }
   if (!rows.length) { $('o_stock').innerHTML = '<div class="empty"><b>Nothing here</b>No item matches this choice. Tap <i>+ Add item</i> to add one.</div>'; drawSelBar(); return; }
   const shown = rows.slice(0, PAGE * PER), groups = grouped(shown), sel = !!SEL, all = $('aF').value === '';
@@ -373,15 +477,49 @@ function drawStock(){
     return '<div class="sec"><h3><span>' + (all ? esc(a.name) + ' · ' : '') + esc(g.loc || '(no place written)') + '</span><span class="pill">' + g.rows.length + ' item(s)' +
       (sel ? ' · <a href="#" onclick="selGroup(\'' + g.area + '\',' + JSON.stringify(g.loc).replace(/"/g, '&quot;') + ');return false">select all</a>' : '') + '</span></h3><div class="scroll"><table><thead><tr>' +
       (sel ? '<th></th>' : '') + '<th>#</th><th>Item</th><th class="hide-sm">Category</th><th>Reg / Page</th><th>Total</th><th>Used</th><th>Broken / Missing</th><th>Remaining</th><th>Unit</th><th>Condition</th><th>Remarks</th>' + (sel ? '' : '<th></th>') + '</tr></thead><tbody>' +
-      g.rows.map((i, n) => '<tr class="' + (i.state === 'Removed' ? 'off' : '') + (sel && SEL.has(i.id) ? ' sel' : '') + '"' + (sel ? ' onclick="selOne(\'' + i.id + '\')" style="cursor:pointer"' : '') + '>' +
+      g.rows.map((i, n) => '<tr data-iid="' + i.id + '" class="' + (i.state === 'Removed' ? 'off' : '') + (sel && SEL.has(i.id) ? ' sel' : '') + '"' + (sel ? ' onclick="selOne(\'' + i.id + '\')" style="cursor:pointer"' : '') + '>' +
         (sel ? '<td class="keep"><input type="checkbox" ' + (SEL.has(i.id) ? 'checked' : '') + ' onclick="event.stopPropagation();selOne(\'' + i.id + '\')"></td>' : '') +
-        '<td>' + (n + 1) + '</td><td class="l"><b>' + esc(i.name) + '</b></td><td class="hide-sm l pill">' + esc(i.cat) + '</td><td>' + esc(i.reg) + '</td><td><b>' + esc(i.total) + '</b></td><td>' + esc(i.used) + '</td>' +
+        (sel || i.state === 'Removed' ? '<td>' + (n + 1) + '</td><td class="l"><b>' + esc(i.name) + '</b></td><td class="hide-sm l pill">' + esc(i.cat) + '</td><td>' + esc(i.reg) + '</td><td><b>' + esc(i.total) + '</b></td><td>' + esc(i.used) + '</td>' +
         '<td>' + ((num(i.faulty) || 0) > 0 || (i.faulty && num(i.faulty) === null) ? '<b style="color:var(--neg)">' + esc(i.faulty) + '</b>' : esc(i.faulty)) + '</td><td>' + esc(i.remain) + '</td><td>' + esc(i.unit) + '</td>' +
-        '<td class="keep">' + condTag(i) + '</td><td class="l pill keep">' + esc(i.rem) + (i.state === 'Removed' ? '<div><b>Removed ' + esc(i.remOn.slice(0, 10)) + ':</b> ' + esc(i.why) + '</div>' : '') + '</td>' +
-        (sel ? '' : '<td class="keep"><button class="btn sm" onclick="itemDlg(\'' + i.id + '\')">Edit</button></td>') + '</tr>').join('') +
+        '<td class="keep">' + condTag(i) + '</td><td class="l pill keep">' + esc(i.rem) + (i.state === 'Removed' ? '<div><b>Removed ' + esc(i.remOn.slice(0, 10)) + ':</b> ' + esc(i.why) + '</div>' : '') + '</td>'
+        : '<td>' + (n + 1) + '</td>' + ieRow(i)) +
+        (sel ? '' : '<td class="keep"><button class="btn sm" onclick="itemDlg(\'' + i.id + '\')" title="Place, remove, history">⋯</button></td>') + '</tr>').join('') +
       '</tbody></table></div></div>';
   }).join('') + (shown.length < rows.length ? '<div style="text-align:center;margin:10px 0"><button class="btn" onclick="PAGE++;drawStock()">Show more (' + (rows.length - shown.length) + ' left)</button></div>' : '');
   drawSelBar();
+}
+/* ---------- instant edit: every value of the table is an input that saves by itself ---------- */
+const ie = (i, f, cls, w) => '<input class="ie' + (cls ? ' ' + cls : '') + '" data-f="' + f + '" value="' + esc(i[f]) + '"' + (w ? ' style="min-width:' + w + 'px"' : '') + (f === 'cat' ? ' list="dlCat"' : f === 'unit' ? ' list="dlUnit"' : '') + '>';
+function ieRow(i){
+  const red = (num(i.faulty) || 0) > 0 ? 'red' : '';
+  return '<td class="l">' + ie(i, 'name', 'b', 230) + '</td><td class="hide-sm l">' + ie(i, 'cat', 'pill', 110) + '</td><td class="c">' + ie(i, 'reg', '', 60) + '</td><td class="c">' + ie(i, 'total', 'b', 50) + '</td><td class="c">' + ie(i, 'used', '', 44) + '</td>' +
+    '<td class="c">' + ie(i, 'faulty', red, 50) + '</td><td class="c" data-rem="1">' + (num(i.total) === null ? ie(i, 'remain', '', 50) : esc(i.remain)) + '</td><td class="c">' + ie(i, 'unit', '', 54) + '</td>' +
+    '<td><select class="ie" data-f="cond">' + CONDS.map(c => '<option value="' + c + '"' + (c === i.cond ? ' selected' : '') + '>' + (c || '—') + '</option>').join('') + (i.cond && !CONDS.includes(i.cond) ? '<option selected>' + esc(i.cond) + '</option>' : '') + '</select></td>' +
+    '<td class="l"><textarea class="ie pill" data-f="rem" rows="1" style="min-width:140px">' + esc(i.rem) + '</textarea></td>';
+}
+const ITIMER = {};
+function itemField(el, now){
+  const tr = el.closest('tr[data-iid]'); if (!tr) return;
+  const id = tr.dataset.iid, it = D.items.find(x => x.id === id); if (!it) return;
+  if (['total', 'used', 'faulty'].includes(el.dataset.f)) {                    // remaining at once
+    const v = k => { const e = tr.querySelector('[data-f="' + k + '"]'); return e ? e.value : it[k]; }, td = tr.querySelector('[data-rem]');
+    if (td && num(v('total')) !== null) td.textContent = remainOf(v('total'), v('used'), v('faulty'));
+    const fe = tr.querySelector('[data-f="faulty"]'); if (fe) fe.classList.toggle('red', (num(fe.value) || 0) > 0);
+  }
+  clearTimeout(ITIMER[id]); tr.classList.remove('saved', 'failed'); tr.classList.add('saving');
+  ITIMER[id] = setTimeout(() => itemPush(id, tr), now ? 0 : 900);
+}
+async function itemPush(id, tr){
+  const it = D.items.find(x => x.id === id); if (!it) return;
+  const x = { id, area: it.area, loc: it.loc, cat: it.cat, name: it.name, reg: it.reg, total: it.total, used: it.used, faulty: it.faulty, remain: it.remain, unit: it.unit, cond: it.cond, rem: it.rem };
+  tr.querySelectorAll('[data-f]').forEach(e => x[e.dataset.f] = e.value.trim());
+  if (!x.name) { tr.classList.remove('saving'); tr.classList.add('failed'); say('err', 'The item name cannot be empty.'); return; }
+  try{
+    const r = await api({ action: 'pv_items_save', items: [x] }); mergeItems(r.items);
+    tr.classList.remove('saving'); tr.classList.add('saved'); setTimeout(() => tr.classList.remove('saved'), 1500);
+    const td = tr.querySelector('[data-rem]'), o = D.items.find(y => y.id === id); if (td && num(o.total) !== null) td.textContent = o.remain;
+    stockKpis(stockRows());
+  }catch(e){ tr.classList.remove('saving'); tr.classList.add('failed'); say('err', it.name + ': ' + e.message); }
 }
 /* selection: remove / restore / delete many */
 function toggleSel(){ SEL = SEL ? null : new Set(); $('selBtn').textContent = SEL ? 'Done selecting' : 'Select'; $('selBtn').classList.toggle('p', !!SEL); drawStock(); }
@@ -394,7 +532,7 @@ function drawSelBar(){
   b.innerHTML = '<b>' + L.length + ' selected</b><span style="flex:1"></span>' +
     '<button class="btn sm" onclick="SEL=new Set(stockRows().map(i=>i.id));drawStock()">Select all shown</button><button class="btn sm" onclick="SEL.clear();drawStock()">Clear</button>' +
     (act ? '<button class="btn sm no" onclick="removeDlg([...SEL].filter(id=>D.items.find(i=>i.id===id&&i.state!==\'Removed\')))">Remove ' + act + '</button>' : '') +
-    (rem ? '<button class="btn sm ok" onclick="restore([...SEL])">Restore ' + rem + '</button><button class="btn sm no" onclick="delForGood([...SEL])">Delete ' + rem + ' for good</button>' : '');
+    (rem ? '<button class="btn sm ok" onclick="restore([...SEL])">Restore ' + rem + '</button><button class="btn sm no adm" onclick="delForGood([...SEL])">Delete ' + rem + ' for good</button>' : '');
 }
 function setLocList(areaId){ $('dlLoc').innerHTML = locsOf(areaId).map(l => '<option value="' + esc(l) + '">').join(''); }
 function itemDlg(id, again){
@@ -416,7 +554,7 @@ function itemDlg(id, again){
     '<label class="w">Remarks<textarea id="i_rem" rows="2">' + esc(i.rem) + '</textarea></label></div>' +
     (id && i.state === 'Removed' ? '<div class="note" style="margin:10px 0 0">Removed on ' + esc(i.remOn) + ' by ' + esc(i.remBy) + ': ' + esc(i.why) + '</div>' : '') +
     (id ? '<div class="pill" style="margin-top:8px">Added by ' + esc(i.addBy) + ' on ' + esc(i.addOn) + (i.upAt && i.upAt !== i.addOn ? ' · last change by ' + esc(i.upBy) + ' on ' + esc(i.upAt) : '') + '</div>' : '') +
-    '<div class="dacts">' + (id ? (i.state === 'Removed' ? '<button class="btn ok left" onclick="restore([\'' + id + '\'])">Restore</button><button class="btn no" onclick="delForGood([\'' + id + '\'])">Delete for good</button>'
+    '<div class="dacts">' + (id ? (i.state === 'Removed' ? '<button class="btn ok left" onclick="restore([\'' + id + '\'])">Restore</button><button class="btn no adm" onclick="delForGood([\'' + id + '\'])">Delete for good</button>'
       : '<button class="btn no left" onclick="removeDlg([\'' + id + '\'])">Remove…</button>') : '') +
     '<button class="btn" onclick="$(\'dlg\').close()">Cancel</button>' + (id ? '' : '<button class="btn" onclick="itemSave(\'\', true)">Save &amp; add another</button>') +
     '<button class="btn p" onclick="itemSave(\'' + (id || '') + '\')">Save</button></div>';
@@ -500,7 +638,7 @@ const REPS = [
 function drawReports(){
   const A = sortAreas(D.areas), opts = '<option value="">All areas</option>' + A.map(a => '<option value="' + a.id + '">' + esc(a.name) + '</option>').join('');
   const places = [...new Set(D.items.filter(i => i.state !== 'Removed').map(i => areaOf(i.area).name + ' · ' + (i.loc || '—')))].sort(natural);
-  $('o_reports').innerHTML = REPS.map(r => '<div class="rcard"><h4>' + r[1] + '</h4><p>' + r[2] + '</p>' +
+  $('o_reports').innerHTML = REPS.filter(r => D.role !== 'team' || !['status', 'pending'].includes(r[0])).map(r => '<div class="rcard"><h4>' + r[1] + '</h4><p>' + r[2] + '</p>' +
     (r[3] === true ? '<select id="ra_' + r[0] + '">' + opts + '</select>' : r[3] === 'place' ? '<select id="ra_place">' + places.map(p => '<option>' + esc(p) + '</option>').join('') + '</select>' : '') +
     '<div class="acts"><button class="btn p sm" onclick="rep(\'' + r[0] + '\')">PDF / Excel</button>' + (r[0] === 'pending' ? '<button class="btn sm" onclick="shareText(pendingText())">WhatsApp</button>' : '') +
     (r[0] === 'status' ? '<button class="btn sm" onclick="shareText(statusText())">WhatsApp</button>' : '') + '</div></div>').join('');
@@ -623,6 +761,11 @@ function drawLog(){
 /* ---------------- START ---------------- */
 (function(){
   if (!user || !pass) { document.querySelector('.wrap').innerHTML = '<div class="empty"><b>Sign in first</b>Open the attendance app and sign in, then come back.</div>'; return; }
+  $('o_stock').addEventListener('input', e => { if (e.target.dataset.f && e.target.tagName !== 'SELECT') itemField(e.target); });
+  $('o_stock').addEventListener('change', e => { if (e.target.dataset.f && e.target.tagName === 'SELECT') itemField(e.target, true); });
+  $('o_stock').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input.ie')) { e.preventDefault(); const L = [...$('o_stock').querySelectorAll('input.ie[data-f="' + e.target.dataset.f + '"]')], k = L.indexOf(e.target); if (L[k + 1]) L[k + 1].focus(); } });
+  $('o_status').addEventListener('input', e => { if (e.target.dataset.af && e.target.tagName !== 'SELECT' && e.target.type !== 'date') areaField(e.target); });
+  $('o_status').addEventListener('change', e => { if (e.target.dataset.af && (e.target.tagName === 'SELECT' || e.target.type === 'date')) areaField(e.target); });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && $('dlg').open && e.target.tagName === 'INPUT') { const b = $('dlgIn').querySelector('.dacts .btn.p'); if (b) { e.preventDefault(); b.click(); } } });
   load('');
 })();
