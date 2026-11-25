@@ -660,6 +660,7 @@ document.addEventListener('click', async e => {
   else if(t.id === 'rT96'){ E.tick = new Set(E.items.map((x, i) => i).filter(i => (E.items[i].opts[E.items[i].sel] || {}).pct >= 96)); paintEd(); }
 });
 $('#ed').addEventListener('click', e => { if(e.target.id === 'ed'){ E = null; paintEd(); paintStats(); } });
+$('#ed').addEventListener('change', e => { if(e.target.name === 'eWhy' && E && $('#prev')){ readEd(); $('#prev').innerHTML = certHtml(Object.assign({}, E.v, { copy:'DUPLICATE' })); } });   // a DUPLICATE reason ticked: the preview shows it at once
 render();
 if(user && pass && (ls.get('admin', false) === true || (ls.get('svc', []) || []).indexOf('certificates') >= 0)){ loadSheets(); if(S.sheet) run(qs.get('prepare') === '1' ? 'prep' : 'load'); }
 </script>
