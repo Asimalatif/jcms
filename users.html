@@ -37,7 +37,8 @@ header h1{margin:0;font-size:18px}header small{display:block;opacity:.8;font-siz
 .u .nm{flex:1;min-width:200px}.u .nm b{font-size:15px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--muted)}
-.chip.on{background:var(--pos-bg);border-color:var(--pos);color:var(--pos)}
+.chip.on{background:var(--pos-bg);border-color:var(--pos);color:var(--pos);border-width:2px}
+.chip:not(.on){opacity:.7}
 .chip:disabled{cursor:default}
 .pill{display:inline-block;border-radius:20px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:4px}
 .pill.ok{background:var(--pos-bg);color:var(--pos)}.pill.no{background:var(--neg-bg);color:var(--neg)}.pill.mid{background:var(--mid-bg);color:var(--mid)}
@@ -139,6 +140,7 @@ function card(r){
   return `<div class="u ${r.blocked ? 'off' : ''}"><div class="top"><div class="nm"><b>${esc(r.teacher || '(no name)')}</b>${r.admin ? '<span class="pill ok">main admin</span>' : ''}${r.blocked ? '<span class="pill no">login off</span>' : ''}${!r.hasPass && !r.admin ? '<span class="pill mid">no password</span>' : ''}${r.cp ? `<span class="pill ok">Chief Proctor ${esc(r.cp)}</span>` : ''}${r.tt ? `<span class="pill mid">Timetable: ${esc(r.tt)}</span>` : ''}${hidOf(r).length ? `<span class="pill no">Hidden: ${esc(hidOf(r).join(', '))}</span>` : ''}
       <div class="sub">${esc(r.username || 'no username')}${r.role ? ' · ' + esc(r.role) : ''}${r.dept ? ' · ' + esc(r.dept) : ''}${r.desig ? ' · ' + esc(r.desig) : ''}${r.status ? ' · ' + esc(r.status) : ''} · row ${r.row}</div></div>
     <button class="btn sm" data-ed="${i}">Edit</button>${r.admin ? '' : `<button class="btn sm" data-off="${i}" ${S.busy ? 'disabled' : ''}>${r.blocked ? 'Switch login on' : 'Switch login off'}</button>`}</div>
+    ${r.admin ? '' : `<div class="sub" style="margin-top:6px">${r.svc.filter(k => S.d.services.some(s => s.key === k)).length ? '<b style="color:var(--pos)">Active services:</b> ' + S.d.services.filter(s => r.svc.includes(s.key)).map(s => '✓ ' + esc(s.label) + partTxt(r, s)).join(' · ') : 'No services active (tap a service below to switch it on).'}</div>`}
     ${r.admin ? '<div class="sub" style="margin-top:6px">Has every service.</div>' : `<div class="chips">${S.d.services.map(s => `<button type="button" class="chip ${r.svc.includes(s.key) ? 'on' : ''}" data-sv="${i}|${s.key}" title="${esc(s.about)}" ${S.busy ? 'disabled' : ''}>${r.svc.includes(s.key) ? '✓ ' : ''}${esc(s.label)}${partTxt(r, s)}</button>`).join('')}</div>`}</div>`;
 }
 function wire(){
@@ -188,7 +190,7 @@ function edit(r){
       </div></div>
     <div style="margin-top:12px"><b>Services</b> <span class="sub">(pages this login may open)</span>
       ${D.services.map(s => { const on = r.svc.includes(s.key), part = r.svc.filter(t => t.indexOf(s.key + '.') === 0);
-        return `<label class="ck"><input type="checkbox" data-es="${s.key}" ${on ? 'checked' : ''}><span><b>${esc(s.label)}</b><small>${esc(s.about)}</small></span></label>
+        return `<label class="ck"><input type="checkbox" data-es="${s.key}" ${on ? 'checked' : ''}><span><b>${esc(s.label)}</b>${on ? ' <b style="color:var(--pos);font-size:12px">✓ active now</b>' : ''}<small>${esc(s.about)}</small></span></label>
         ${(s.subs || []).length ? `<div class="subs" data-for="${s.key}" style="margin:0 0 6px 30px;padding:4px 10px;border-left:3px solid var(--line);${on ? '' : 'display:none'}">
           <div class="sub" style="font-size:12px">Parts of ${esc(s.label)} <button type="button" class="lnk" data-all="${s.key}" style="border:0;background:none;color:var(--brown);font-weight:700;cursor:pointer;font-size:12px">all</button>·<button type="button" class="lnk" data-none="${s.key}" style="border:0;background:none;color:var(--brown);font-weight:700;cursor:pointer;font-size:12px">none</button></div>
           ${s.subs.map(x => `<label class="ck" style="margin:2px 0"><input type="checkbox" data-sub="${s.key}.${x.k}" ${!part.length || part.includes(s.key + '.' + x.k) ? 'checked' : ''}><span>${esc(x.label)}</span></label>`).join('')}</div>` : ''}`; }).join('')}
