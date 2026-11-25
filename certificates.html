@@ -280,7 +280,7 @@ function paintList(){
   const lab = { ready:['t-ready', 'Ready'], match:['t-match', 'Not linked'], fail:['t-fail', 'Not eligible'], left:['t-left', 'Left'] };
   box.innerHTML = (L.length ? '' : '<div class="sub">Nobody here.</div>') + L.slice(0, max).map(r => {
     const st = status(r), t = st === 'match' && canPrint(r) ? ['t-match', 'Ready · no Enroll#'] : lab[st];
-    return `<div class="it ${r.struck ? 'struck' : ''}" data-row="${r.row}"><div class="tx"><b>${esc(r.name)}</b>${qOf(r) ? ' <small style="color:var(--blue);font-weight:800">· changed offline, waiting to send</small>' : ''}${canPrint(r) && !String(r.group || '').trim() ? ' <small style="color:var(--bad);font-weight:800">· no "Appeared in (group)"</small>' : ''}<small>D/o ${esc(r.father)} · Roll ${esc(r.roll || '—')} · ${esc(r.marks || '—')} · ${esc(r.grade || '—')}${r.enroll ? ' · ' + esc(r.enroll) : ''}${r.pcs ? ' · ' + esc(r.pcs) : ''}${r.pstatus ? ' · Portal: ' + esc(r.pstatus) : ''}</small>${r.remarks ? `<small>Remarks: ${esc(r.remarks)}</small>` : ''}${hasDist(r) ? `<small style="color:var(--good);font-weight:700">Distinction: ${esc(r.dist)}</small>` : r.pos && Number(r.pos) <= 20 ? `<small style="color:var(--blue);font-weight:700">Board position ${esc(r.pos)} — no distinction typed</small>` : ''}${st === 'fail' ? `<small style="color:var(--bad);font-weight:700">Not eligible: ${esc(whyNot(r))}</small>` : ''}${st === 'left' ? `<small style="color:var(--muted);font-weight:700">${esc(r.how || 'Struck through')}</small>` : ''}${r.leftHint ? `<small style="color:var(--mid);font-weight:700">Possible left student: ${esc(hintText(r.leftHint))}</small>` : ''}${!r.struck && !r.enroll ? (() => { const qc = quickCands(r); return qc.length ? `<div class="qc">${qc.map(c => { const p = Math.round(c.sc * 100); return `<button type="button" class="${S.picks[r.row] === c.s.id ? 'on' : ''}" data-qrow="${r.row}" data-qpick="${esc(c.s.id)}"><span class="p ${p >= 90 ? 'hi' : p >= 75 ? 'md' : ''}">${p}%</span><b>${esc(c.s.name)}</b> <small>D/o ${esc(c.s.father)}${c.s.enroll ? ' · ' + esc(c.s.enroll) : ''}${c.s.pcs ? ' · ' + esc(c.s.pcs) : ''}</small></button>`; }).join('')}</div>` : '<small style="color:var(--muted)">No 60%+ student in the list — open her to search.</small>'; })() : ''}</div>${canPrint(r) && !r.dob ? '<span class="tag t-warn">No DOB</span>' : ''}<span class="tag ${t[0]}">${t[1]}</span></div>`;
+    return `<div class="it ${r.struck ? 'struck' : ''}" data-row="${r.row}"><div class="tx"><b>${esc(r.name)}</b>${r.copy ? ' <small style="font-weight:800;border:1px solid currentColor;border-radius:6px;padding:0 4px">DUPLICATE</small>' : ''}${qOf(r) ? ' <small style="color:var(--blue);font-weight:800">· changed offline, waiting to send</small>' : ''}${canPrint(r) && !String(r.group || '').trim() ? ' <small style="color:var(--bad);font-weight:800">· no "Appeared in (group)"</small>' : ''}<small>D/o ${esc(r.father)} · Roll ${esc(r.roll || '—')} · ${esc(r.marks || '—')} · ${esc(r.grade || '—')}${r.enroll ? ' · ' + esc(r.enroll) : ''}${r.pcs ? ' · ' + esc(r.pcs) : ''}${r.pstatus ? ' · Portal: ' + esc(r.pstatus) : ''}</small>${r.remarks ? `<small>Remarks: ${esc(r.remarks)}</small>` : ''}${hasDist(r) ? `<small style="color:var(--good);font-weight:700">Distinction: ${esc(r.dist)}</small>` : r.pos && Number(r.pos) <= 20 ? `<small style="color:var(--blue);font-weight:700">Board position ${esc(r.pos)} — no distinction typed</small>` : ''}${st === 'fail' ? `<small style="color:var(--bad);font-weight:700">Not eligible: ${esc(whyNot(r))}</small>` : ''}${st === 'left' ? `<small style="color:var(--muted);font-weight:700">${esc(r.how || 'Struck through')}</small>` : ''}${r.leftHint ? `<small style="color:var(--mid);font-weight:700">Possible left student: ${esc(hintText(r.leftHint))}</small>` : ''}${!r.struck && !r.enroll ? (() => { const qc = quickCands(r); return qc.length ? `<div class="qc">${qc.map(c => { const p = Math.round(c.sc * 100); return `<button type="button" class="${S.picks[r.row] === c.s.id ? 'on' : ''}" data-qrow="${r.row}" data-qpick="${esc(c.s.id)}"><span class="p ${p >= 90 ? 'hi' : p >= 75 ? 'md' : ''}">${p}%</span><b>${esc(c.s.name)}</b> <small>D/o ${esc(c.s.father)}${c.s.enroll ? ' · ' + esc(c.s.enroll) : ''}${c.s.pcs ? ' · ' + esc(c.s.pcs) : ''}</small></button>`; }).join('')}</div>` : '<small style="color:var(--muted)">No 60%+ student in the list — open her to search.</small>'; })() : ''}</div>${canPrint(r) && !r.dob ? '<span class="tag t-warn">No DOB</span>' : ''}<span class="tag ${t[0]}">${t[1]}</span></div>`;
   }).join('') + (L.length > max ? `<div class="sub">${L.length - max} more — search to narrow.</div>` : '');
   const n = Object.keys(S.picks).length;
   box.insertAdjacentHTML('beforeend', n ? `<div id="qbar"><b style="flex:1">${n} student${n > 1 ? 's' : ''} selected</b><button class="btn sm" id="qClear">Clear</button><button class="btn ok" id="qFill" ${S.busy ? 'disabled' : ''}>${S.busy === 'qfill' ? 'Saving…' : 'Fill ' + n + ' in one go'}</button></div>` : '');
@@ -306,7 +306,14 @@ function certVals(r){
   const D = S.data, two = /2nd/i.test(D.sheet);
   const y = Number((D.sheet.match(/20\d\d/) || [new Date().getFullYear()])[0]);
   return { name:r.name, father:r.father, group:r.group || '', session:r.session || (y - 1) + '-' + String(y).slice(2), roll:r.roll, reg:r.reg, marks:r.marks,
-    total:r.total || D.total, grade:r.grade, dob:r.dob, dist:r.dist || 'NIL', conduct:r.conduct || 'GOOD' };
+    total:r.total || D.total, grade:r.grade, dob:r.dob, dist:r.dist || 'NIL', conduct:r.conduct || 'GOOD', copy:r.copy || '' };
+}
+/* certificate issued again: "DUPLICATE dd-mm-yyyy" in the Copy column -> DUPLICATE mark above the title */
+const REISSUE = [['lost', 'Lost her previous certificate', true], ['improve', 'Marks changed after improvement', true],
+  ['spelling', 'Name / father name spelling corrected', false], ['retotal', 'Marks increased after re-totaling', false]];
+function dupHtml(copy){
+  const m = String(copy || '').match(/^DUPLICATE\s*(.*)$/i); if(!m) return '';
+  return `<div style="text-align:right;margin:10px 0 -10px"><span style="display:inline-block;border:2px solid #000;padding:3px 12px;font-weight:bold;letter-spacing:4px;font-size:15px">DUPLICATE</span>${m[1] ? `<div style="font-size:11px;margin-top:3px">Date of issue: ${esc(m[1])}</div>` : ''}</div>`;
 }
 function certHtml(v){
   const A = S.assets || {}, cfg = A.cfg || { title:'PROVISIONAL CUM CHARACTER CERTIFICATE', college:'JINNAH COLLEGE FOR WOMEN', university:'UNIVERSITY OF PESHAWAR', gazette:'has been declared successful according to the Result Gazette, of Board of Intermediate and Secondary Education, Peshawar.', sign:['Principal,', 'Jinnah College for Women,', 'University of Peshawar.'] };
@@ -315,7 +322,7 @@ function certHtml(v){
   return `<div class="cert ${fail ? 'fail' : ''}">
     <div class="t">${A.logo ? `<img src="${A.logo}" style="width:470px;max-width:100%">` : `<div style="font-size:30px;font-weight:bold;color:#1F4E8C">${esc(cfg.college)}</div>`}</div>
     <div class="t" style="font-size:20px;font-weight:bold;color:#1F4E8C;margin-top:4px">${esc(cfg.university)}</div>
-    <div class="t" style="font-size:14px;font-weight:bold;text-decoration:underline;margin:22px 0 26px">${esc(cfg.title)}</div>
+    ${dupHtml(v.copy)}<div class="t" style="font-size:14px;font-weight:bold;text-decoration:underline;margin:22px 0 26px">${esc(cfg.title)}</div>
     ${row([['This is to certify that Miss.', v.name, 70]])}${row([['Daughter of Mr.', v.father, 70]])}${row([['Appeared in the', v.group, 30], ['Examination held in', v.session, 25]])}
     <div style="margin-top:18px;line-height:1.5">${esc(cfg.gazette)}</div><div style="margin-top:14px">Other Particulars are: -</div>
     ${row([['Roll No.', v.roll, 30], ['Registration No.', v.reg, 40]])}${row([['Marks obtained', v.marks, 15], ['out of', v.total, 15], ['Grade/Division', v.grade, 15]])}
@@ -349,6 +356,13 @@ function paintEd(){
       <button class="btn" id="ePrint">Print this one</button>
       ${r ? `<button class="btn" id="eDrive">PDF to Drive</button><button class="btn red" id="eStrike">${r.struck ? 'Remove strike-through' : 'Strike through (no certificate)'}</button>` : ''}
     </div>
+    ${r ? `<div class="sec">Student came again for her certificate</div>
+    <div class="sub">If her marks or name changed, correct them above first. Then choose why she needs it again: the app decides whether <b>DUPLICATE</b> is printed.</div>
+    <div style="display:grid;gap:6px;margin-top:8px">${REISSUE.map(x => `<label style="display:flex;gap:8px;align-items:center;cursor:pointer;padding:7px 10px;border:1.5px solid var(--line);border-radius:10px"><input type="radio" name="eWhy" value="${x[0]}" style="width:18px;height:18px"><span style="flex:1">${x[1]}</span><b style="font-size:12px;color:${x[2] ? 'var(--bad)' : 'var(--ok, #0E8A5F)'}">${x[2] ? 'DUPLICATE' : 'no duplicate'}</b></label>`).join('')}</div>
+    <input class="search" id="eWhyNote" placeholder="Note (optional), e.g. improvement exam 2026, new marks 512" style="margin-top:8px">
+    <div class="acts"><button class="btn pri" id="eIssue">${E.busy === 'issue' ? 'Saving…' : 'Issue again & print'}</button></div>
+    ${r.copy ? `<div class="note mid">This certificate now prints as <b>DUPLICATE</b> (date of issue ${esc(r.copy.replace(/^DUPLICATE\s*/i, '') || '-')}). To print it without DUPLICATE, issue it again with a "no duplicate" reason.</div>` : ''}
+    ${r.issues ? `<div class="sub" style="margin-top:6px"><b>Issued again:</b><br>${r.issues.split(' | ').map(esc).join('<br>')}</div>` : ''}` : ''}
     <div class="sec">Linked student (Transform)</div>
     ${(() => { const pk = E.pick, cur = r && r.enroll ? (r.sname || r.name) + ' · ' + r.enroll + (r.pcs ? ' · ' + r.pcs : '') : '';
       return pk !== undefined ? `<div class="note mid">${pk ? 'Will link to <b>' + esc(pk.name) + '</b> D/o ' + esc(pk.father) + (pk.enroll ? ' · ' + esc(pk.enroll) : '') : 'Will remove the link'} — press <b>Save</b>. <button class="btn sm" id="ePickUndo">Undo</button></div>`
@@ -369,6 +383,21 @@ function upsert(row){
   const R = S.data.rows, i = R.findIndex(x => x.row === row.row);
   if(i >= 0) R[i] = row; else R.push(row);
   prep(); findAuto(); return row;
+}
+async function issueEd(){
+  const why = (document.querySelector('#ed input[name="eWhy"]:checked') || {}).value, note = ($('#eWhyNote') || {}).value || '';
+  if(!why){ E.err = 'Choose why she needs the certificate again.'; paintEd(); return; }
+  if(!navigator.onLine){ E.err = 'Issuing again needs the internet (the reason is written in the sheet).'; paintEd(); return; }
+  readEd(); const r = E.r, v = E.v, send = { name:v.name, father:v.father };
+  ['roll', 'reg', 'marks', 'grade', 'dob', 'group', 'session', 'dist', 'total', 'conduct'].forEach(k => { if(String(v[k] || '') !== String(certVals(r)[k] || '')) send[k] = v[k]; });
+  E.busy = 'issue'; E.err = ''; E.msg = ''; paintEd();
+  try{
+    const x = await api({ action:'pc_save', sheet:S.data.sheet, row:r.row, expect:{ name:r.name, father:r.father, roll:r.roll }, values:send, issue:{ reason:why, note:note.trim() } }, 120000);
+    if(x.moved) S.data.rows = S.data.rows.filter(z => z.row !== r.row);
+    E.r = upsert(x.row); E.v = certVals(E.r); E.busy = false;
+    E.msg = E.r.copy ? 'Saved: this certificate prints as DUPLICATE.' : 'Saved: a normal certificate (no DUPLICATE).'; paintEd(); paintStats();
+    await assets(); $('#print').innerHTML = certHtml(E.v); window.print();
+  }catch(e){ E.busy = false; E.err = e.message; paintEd(); }
 }
 async function saveEd(){
   readEd(); const r = E.r, v = E.v;
@@ -619,6 +648,7 @@ document.addEventListener('click', async e => {
   else if(t.id === 'cNew'){ await assets(); openEd(null); }
   else if(t.id === 'eClose'){ E = null; paintEd(); paintStats(); }
   else if(t.id === 'eSave') saveEd();
+  else if(t.id === 'eIssue') issueEd();
   else if(t.id === 'eStrike'){ if(!navigator.onLine){ E.err = 'Strike-through needs the internet.'; paintEd(); } else strikeEd(); }
   else if(t.id === 'ePrint'){ readEd(); await assets(); $('#print').innerHTML = certHtml(E.v); window.print(); }
   else if(t.id === 'eDrive'){ const p = await drive([E.r]); if(p){ E.msg = 'PDF saved in Drive.'; paintEd(); window.open(p.url, '_blank'); } else { E.err = S.err; paintEd(); } }
