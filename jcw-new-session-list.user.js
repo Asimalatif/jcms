@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.0
+// @version      1.1
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
@@ -390,9 +390,9 @@
     try {
       const all = await collectList(), first = all.filter(it => /1st/i.test(it.row['Class']));
       const cnt = {}; first.forEach(it => { const b = it.row['Batch'] || '(no batch)'; cnt[b] = (cnt[b] || 0) + 1; });
-      const B = Object.keys(cnt).sort().reverse();
-      $('jnBatch').innerHTML = B.map(b => `<option value="${b}">${b} (${cnt[b]})</option>`).join('') + `<option value="*">All 1st Year (${first.length})</option>`;
-      LIST = first; say(first.length + ' enrolled 1st Year students on the portal. Check the batch and the settings, then press 2.', 0);
+      const B = Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x]);   // the portal's Batch is often empty or old: "All 1st Year" is the default
+      $('jnBatch').innerHTML = `<option value="*" selected>All 1st Year (${first.length})</option>` + B.map(b => `<option value="${b}">only batch ${b} (${cnt[b]})</option>`).join('');
+      LIST = first; say(first.length + ' enrolled 1st Year students on the portal (all of them are chosen). Check the settings, then press 2.', 0);
     } catch (e) { say(e.message === 'LOGIN' ? 'The portal logged you out. Log in again and open Students.' : 'Stopped: ' + e.message); }
     lock(false);
   };
