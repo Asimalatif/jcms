@@ -393,11 +393,10 @@ async function areaDel(id){
 }
 function nextSes(s){ const m = String(s).match(/^(\d{4})-(\d{2})$/); return m ? (Number(m[1]) + 1) + '-' + String(Number(m[1]) + 2).slice(2) : ''; }
 function sessionDlg(){
-  $('dlgIn').innerHTML = '<h3>New session</h3><div class="note" style="margin:0 0 10px">The same areas, teams and logins are copied with status <b>Pending</b>, and the Drive folder for the new year (e.g. 2027) is made inside <i>Physical verification</i>. With the box ticked every active item comes too, and what was <b>remaining</b> at the end of ' + esc(D.session) +
-    ' becomes the new <b>total</b> (items used up or finished are left out). ' + esc(D.session) + ' stays as it is.</div><div class="fg">' +
+  $('dlgIn').innerHTML = '<h3>New session</h3><div class="note" style="margin:0 0 10px">The new session is an <b>exact copy</b> of ' + esc(D.session) + ': the same areas, teams, logins and <b>every item with the same figures</b>, condition and remarks (nothing is left out or changed). Only the status starts as <b>Pending</b>. The Drive folder of the new year (e.g. 2027) is made with <b>copies of this year\'s documents</b>. The staff then change the new year\'s items and figures themselves. ' + esc(D.session) + ' stays as it is.</div><div class="fg">' +
     '<label>Copy from<select id="f_from">' + D.sessions.map(s => '<option' + (s === D.session ? ' selected' : '') + '>' + esc(s) + '</option>').join('') + '</select></label>' +
     '<label>New session<input id="f_to" value="' + esc(nextSes(D.session)) + '" placeholder="2026-27"></label>' +
-    '<label class="w" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input id="f_copy" type="checkbox" checked style="height:auto"> Copy the items (stock carried forward)</label></div>' +
+    '<label class="w" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input id="f_copy" type="checkbox" checked style="height:auto"> Copy all the items as they are</label></div>' +
     '<div class="dacts"><button class="btn" onclick="$(\'dlg\').close()">Cancel</button><button class="btn p" onclick="sessionNew()">Make the session</button></div>';
   $('dlg').showModal();
 }
@@ -405,7 +404,7 @@ async function sessionNew(){
   const from = $('f_from').value, to = $('f_to').value.trim(), copyItems = $('f_copy').checked;
   if (!confirm('Make session ' + to + ' from ' + from + (copyItems ? ' with its stock' : '') + '?')) return;
   $('dlg').close(); say('busy', 'Making session ' + to + '…');
-  try{ const r = await api({ action: 'pv_session_new', from, to, copyItems }); say('ok', 'Session ' + to + ': ' + r.areas + ' areas, ' + r.items + ' items' + (r.folder ? ', Drive folder ' + r.year + ' made' : '') + '.'); load(to); }
+  try{ const r = await api({ action: 'pv_session_new', from, to, copyItems }); say(r.docErr ? 'err' : 'ok', 'Session ' + to + ': ' + r.areas + ' areas, ' + r.items + ' items copied' + (r.folder ? '; Drive folder ' + r.year + ' made with ' + r.docs + ' document(s)' : '') + (r.docErr ? '. Documents could not be copied: ' + r.docErr : '.')); load(to); }
   catch(e){ say('err', e.message); }
 }
 async function seed(){
