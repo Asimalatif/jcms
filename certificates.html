@@ -312,8 +312,8 @@ function certVals(r){
 const REISSUE = [['lost', 'Lost her previous certificate', true], ['improve', 'Marks changed after improvement', true],
   ['spelling', 'Name / father name spelling corrected', false], ['retotal', 'Marks increased after re-totaling', false]];
 function dupHtml(copy){
-  const m = String(copy || '').match(/^DUPLICATE\s*(.*)$/i); if(!m) return '';
-  return `<div style="text-align:right;margin:10px 0 -10px"><span style="display:inline-block;border:2px solid #000;padding:3px 12px;font-weight:bold;letter-spacing:4px;font-size:15px">DUPLICATE</span>${m[1] ? `<div style="font-size:11px;margin-top:3px">Date of issue: ${esc(m[1])}</div>` : ''}</div>`;
+  if(!/^DUPLICATE/i.test(String(copy || ''))) return '';
+  return '<div style="text-align:center;font-size:12px;font-weight:bold;letter-spacing:5px;margin:-18px 0 14px">DUPLICATE</div>';
 }
 function certHtml(v){
   const A = S.assets || {}, cfg = A.cfg || { title:'PROVISIONAL CUM CHARACTER CERTIFICATE', college:'JINNAH COLLEGE FOR WOMEN', university:'UNIVERSITY OF PESHAWAR', gazette:'has been declared successful according to the Result Gazette, of Board of Intermediate and Secondary Education, Peshawar.', sign:['Principal,', 'Jinnah College for Women,', 'University of Peshawar.'] };
@@ -322,7 +322,7 @@ function certHtml(v){
   return `<div class="cert ${fail ? 'fail' : ''}">
     <div class="t">${A.logo ? `<img src="${A.logo}" style="width:470px;max-width:100%">` : `<div style="font-size:30px;font-weight:bold;color:#1F4E8C">${esc(cfg.college)}</div>`}</div>
     <div class="t" style="font-size:20px;font-weight:bold;color:#1F4E8C;margin-top:4px">${esc(cfg.university)}</div>
-    ${dupHtml(v.copy)}<div class="t" style="font-size:14px;font-weight:bold;text-decoration:underline;margin:22px 0 26px">${esc(cfg.title)}</div>
+    <div class="t" style="font-size:14px;font-weight:bold;text-decoration:underline;margin:22px 0 26px">${esc(cfg.title)}</div>${dupHtml(v.copy)}
     ${row([['This is to certify that Miss.', v.name, 70]])}${row([['Daughter of Mr.', v.father, 70]])}${row([['Appeared in the', v.group, 30], ['Examination held in', v.session, 25]])}
     <div style="margin-top:18px;line-height:1.5">${esc(cfg.gazette)}</div><div style="margin-top:14px">Other Particulars are: -</div>
     ${row([['Roll No.', v.roll, 30], ['Registration No.', v.reg, 40]])}${row([['Marks obtained', v.marks, 15], ['out of', v.total, 15], ['Grade/Division', v.grade, 15]])}
@@ -361,7 +361,7 @@ function paintEd(){
     <div style="display:grid;gap:6px;margin-top:8px">${REISSUE.map(x => `<label style="display:flex;gap:8px;align-items:center;cursor:pointer;padding:7px 10px;border:1.5px solid var(--line);border-radius:10px"><input type="radio" name="eWhy" value="${x[0]}" style="width:18px;height:18px"><span style="flex:1">${x[1]}</span><b style="font-size:12px;color:${x[2] ? 'var(--bad)' : 'var(--ok, #0E8A5F)'}">${x[2] ? 'DUPLICATE' : 'no duplicate'}</b></label>`).join('')}</div>
     <input class="search" id="eWhyNote" placeholder="Note (optional), e.g. improvement exam 2026, new marks 512" style="margin-top:8px">
     <div class="acts"><button class="btn pri" id="eIssue">${E.busy === 'issue' ? 'Saving…' : 'Issue again & print'}</button></div>
-    ${r.copy ? `<div class="note mid">This certificate now prints as <b>DUPLICATE</b> (date of issue ${esc(r.copy.replace(/^DUPLICATE\s*/i, '') || '-')}). To print it without DUPLICATE, issue it again with a "no duplicate" reason.</div>` : ''}
+    ${r.copy ? `<div class="note mid">This certificate now prints as <b>DUPLICATE</b> (issued ${esc(r.copy.replace(/^DUPLICATE\s*/i, '') || '-')}). To print it without DUPLICATE, issue it again with a "no duplicate" reason.</div>` : ''}
     ${r.issues ? `<div class="sub" style="margin-top:6px"><b>Issued again:</b><br>${r.issues.split(' | ').map(esc).join('<br>')}</div>` : ''}` : ''}
     <div class="sec">Linked student (Transform)</div>
     ${(() => { const pk = E.pick, cur = r && r.enroll ? (r.sname || r.name) + ' · ' + r.enroll + (r.pcs ? ' · ' + r.pcs : '') : '';
