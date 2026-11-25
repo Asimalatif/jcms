@@ -3612,7 +3612,7 @@ function lowRow(x){
 /* v8.19 services the admin switched on for this login (e.g. a computer assistant): one button per page */
 const SVC_PAGES = { admission:['Admissions', 'admission.html'], idcards:['Student ID (chest) cards', 'idcards.html'], certificates:['Provisional certificates', 'certificates.html'],
   board:['Board results', 'board.html'], duties:['Exam duty lists', 'duties.html'], collegereports:['College reports', 'reports.html'], shortage:['Attendance shortage', 'shortage.html'],
-  leaves:['Approved leaves', 'leaves.html'], recordsummary:['Marked-Missed entries', 'recordsummary.html'], admintools:['Admin tools', 'admintools.html'] };
+  leaves:['Approved leaves', 'leaves.html'], recordsummary:['Marked-Missed entries', 'recordsummary.html'], admintools:['Admin tools', 'admintools.html'], physical:['Physical verification', 'physical.html'] };
 function svcCard(){
   const L = svc.filter(k => SVC_PAGES[k] && !(k === 'leaves' && store.get('lvOp', false)));
   if(!L.length) return '';
@@ -6291,7 +6291,9 @@ function adminExtraCards(){
       <div class="sub">Students who were present in one lecture but absent (or B) in another on the same day: who, which lectures, which teacher, left early / came late, and repeat bunkers of the month. WhatsApp, CSV and print.</div>
       <div class="acts2"><a class="btn primary" id="xBunkA" href="bunkers.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open Bunkers</a></div></section><section class="card"><h3>${I.alert} Attendance shortage</h3>
       <div class="sub">Shortage cases of any month or the whole session, with approved leaves added: program, year, section and subject filters, your own threshold, final list, section and subject counts. PDF, Excel, WhatsApp, save to the month workbook. Admin sets the session and default threshold here.</div>
-      <div class="acts2"><a class="btn primary" href="shortage.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open Shortage report</a></div></section>${leaveCard()}` : ''}<section class="card"><h3>${I.check} Marked-Missed Entries</h3>
+      <div class="acts2"><a class="btn primary" href="shortage.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open Shortage report</a></div></section><section class="card"><h3>${I.check} Physical verification</h3>
+      <div class="sub">College stock checked by each team (labs, library, exam stationery, sick room, college furniture room by room, computer equipment): teams and received / pending status, add or remove items, broken / missing lists, stock registers with signature lines, summary and WhatsApp reminders.</div>
+      <div class="acts2"><a class="btn primary" href="physical.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open Physical verification</a></div></section>${leaveCard()}` : ''}<section class="card"><h3>${I.check} Marked-Missed Entries</h3>
       <div class="sub">Which section and subject has its attendance, monthly tests, grand test and detention marked: record table with ticks, efficiency charts (program, section, subject, teacher), teachers not marking with a WhatsApp image, and a month-wise list.</div>
       <div class="acts2"><a class="btn primary" href="recordsummary.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open Marked-Missed Entries</a></div></section><section class="card"><h3>${I.cal} Timetable editor</h3>
       <div class="sub">The college timetable: edit subject, teacher, days and room of every period, add or remove teachers, rooms, sections and slots, free slots and rooms, clash checks, settings (evening sections, credit hours, timings), change log and backups, print and Excel. Opens with your app login; the tt_admin column decides what you may change.</div>
