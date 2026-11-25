@@ -3572,7 +3572,6 @@ function renderHome(){
   if(cur.length || scope) h += examsCard(cur);
   if(isAdmin || store.get('lvOp', false)) h += leaveCard();
   if(!isAdmin && svc && svc.length) h += svcCard();
-  h += pvCard();
   h += searchCard();
 
   if(cur.length){
@@ -3613,7 +3612,7 @@ function lowRow(x){
 /* v8.19 services the admin switched on for this login (e.g. a computer assistant): one button per page */
 const SVC_PAGES = { admission:['Admissions', 'admission.html'], idcards:['Student ID (chest) cards', 'idcards.html'], certificates:['Provisional certificates', 'certificates.html'],
   board:['Board results', 'board.html'], duties:['Exam duty lists', 'duties.html'], collegereports:['College reports', 'reports.html'], shortage:['Attendance shortage', 'shortage.html'],
-  leaves:['Approved leaves', 'leaves.html'], recordsummary:['Marked-Missed entries', 'recordsummary.html'], admintools:['Admin tools', 'admintools.html'], physical:['Physical verification', 'physical.html'] };
+  leaves:['Approved leaves', 'leaves.html'], recordsummary:['Marked-Missed entries', 'recordsummary.html'], admintools:['Admin tools', 'admintools.html'] };
 /* physical verification duty of this login (PhysicalVerification.gs → whoami.pvd): her team's area, filled in on physical.html */
 function pvCard(){
   const L = store.get('pvd', []); if(!Array.isArray(L) || !L.length) return '';
