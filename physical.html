@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="inksaver.js"></script><script src="jcwout.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6B3423">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>JCW Physical Verification</title>
+<style>
+:root{--bg:#F7EDEA;--surface:#fff;--surface2:#FBEDEA;--ink:#2B1912;--muted:#7C6159;--line:#E2C0B8;--brown:#6B3423;--brown2:#8A4A35;
+  --pos:#0E8A5F;--pos-bg:#E3F4EC;--neg:#C0392B;--neg-bg:#FDE3E1;--mid:#B4740E;--mid-bg:#FFF2DA;--grid:#C9A79E;--shadow:0 1px 2px rgba(74,36,24,.06),0 4px 16px rgba(74,36,24,.07)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A110F;--surface:#261915;--surface2:#30201B;--ink:#F6E9E5;--muted:#C4A8A0;--line:#4A3029;
+  --pos-bg:#14302A;--neg-bg:#3A1C1F;--mid-bg:#3A2F14;--grid:#5A3A31;--shadow:none}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;padding-bottom:60px}
+button,select,input,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:10;background:linear-gradient(120deg,#4A2418,#8A4A35);color:#fff;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+header h1{margin:0;font-size:18px}header small{display:block;opacity:.8;font-size:12px}
+header .sp{flex:1}
+header select{height:36px;border-radius:999px;border:0;background:rgba(255,255,255,.18);color:#fff;font-weight:700;padding:0 12px}
+header select option{color:#000}
+.tb{height:36px;border-radius:999px;border:0;background:rgba(255,255,255,.15);color:#fff;font-weight:700;padding:0 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;font-size:13px}
+.wrap{max-width:1180px;margin:0 auto;padding:16px 12px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button{flex:1;min-width:90px;height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);font-weight:800;cursor:pointer}
+.tabs button.on{background:var(--brown);border-color:var(--brown);color:#fff}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.bar input,.bar select{height:40px;border:1.5px solid var(--line);border-radius:12px;padding:0 10px;background:var(--surface);min-width:0}
+.bar .grow{flex:1;min-width:150px}
+.btn{height:40px;padding:0 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);font-weight:800;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.p{background:linear-gradient(180deg,#8A4A35,#6B3423);border-color:#6B3423;color:#fff}
+.btn.no{border-color:#f2a9a1;color:var(--neg)}.btn.ok{border-color:#9fd8bf;color:var(--pos)}
+.btn.sm{height:32px;padding:0 10px;font-size:12.5px;border-radius:10px}
+.btn:disabled{opacity:.5;cursor:default}
+.status{display:none;align-items:center;gap:10px;padding:10px 13px;border-radius:12px;font-size:13px;margin-bottom:12px;background:var(--mid-bg);color:var(--mid)}
+.status.show{display:flex}.status.err{background:var(--neg-bg);color:var(--neg)}.status.ok{background:var(--pos-bg);color:var(--pos)}
+.spin{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:var(--surface);border:1.5px solid var(--line);border-left:5px solid var(--brown2);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow)}
+.kpi b{display:block;font-size:24px}.kpi span{font-size:12.5px;color:var(--muted);font-weight:700}
+.kpi.neg{border-left-color:var(--neg)}.kpi.neg b{color:var(--neg)}.kpi.pos{border-left-color:var(--pos)}.kpi.pos b{color:var(--pos)}.kpi.mid{border-left-color:var(--mid)}.kpi.mid b{color:var(--mid)}
+.sec{background:var(--surface);border:1.5px solid var(--line);border-top:5px solid var(--brown);border-radius:18px;margin-bottom:14px;box-shadow:var(--shadow);overflow:hidden}
+.sec h3{margin:0;padding:10px 14px;font-size:15px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.sec .sub{padding:10px 14px;color:var(--muted);font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:13px;background:var(--surface)}
+th{background:var(--brown);color:#fff;padding:7px 8px;border:1px solid var(--grid);font-size:11.5px;text-transform:uppercase;white-space:nowrap;text-align:center}
+td{padding:6px 8px;border:1px solid var(--grid);text-align:center;vertical-align:top}
+td.l{text-align:left}
+tbody tr:nth-child(even) td{background:var(--surface2)}
+tr.off td{opacity:.55;text-decoration:line-through}
+tr.off td.keep{text-decoration:none}
+tr.sel td{background:var(--mid-bg)!important}
+.scroll{overflow-x:auto}
+.tag{display:inline-block;border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:800;white-space:nowrap}
+.tag.Received{background:var(--pos-bg);color:var(--pos)}.tag.Pending{background:var(--mid-bg);color:var(--mid)}.tag.Returned{background:var(--neg-bg);color:var(--neg)}
+.tag.bad{background:var(--neg-bg);color:var(--neg)}.tag.used{background:var(--mid-bg);color:var(--mid)}.tag.gone{background:var(--surface2);color:var(--muted)}
+.empty{text-align:center;color:var(--muted);padding:36px 16px;border:2px dashed var(--line);border-radius:18px;background:var(--surface)}
+.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+.note{font-size:12.5px;color:var(--muted);background:var(--surface);border:1.5px dashed var(--line);border-radius:12px;padding:9px 12px;margin-bottom:12px;line-height:1.55}
+.hidden{display:none!important}
+.team{white-space:pre-line;font-size:12.5px;min-width:170px}
+.docs a{display:inline-block;margin:1px 3px;font-size:12px;color:var(--brown2);font-weight:700}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.rcard{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+.rcard h4{margin:0;font-size:15px}.rcard p{margin:0;color:var(--muted);font-size:12.5px}
+.rcard .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+.rcard select{height:36px;border:1.5px solid var(--line);border-radius:10px;padding:0 8px;background:var(--surface)}
+dialog{border:none;border-radius:18px;padding:0;max-width:min(620px,95vw);width:100%;background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog .in{padding:16px}
+dialog h3{margin:0 0 10px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.fg label{display:flex;flex-direction:column;font-size:12px;font-weight:700;color:var(--muted);gap:3px}
+.fg label.w{grid-column:1/-1}
+.fg input,.fg select,.fg textarea{height:40px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);font-weight:400;color:var(--ink)}
+.fg textarea{height:auto;min-height:70px;padding:8px 10px;resize:vertical}
+.dacts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:14px}
+.dacts .left{margin-right:auto}
+.selbar{position:sticky;bottom:10px;z-index:5;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--ink);color:var(--surface);padding:10px 12px;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-top:10px}
+.selbar .btn{height:34px;color:var(--ink);background:var(--surface)}.selbar .btn.no{color:var(--neg)}.selbar .btn.ok{color:var(--pos)}
+.pill{font-size:11.5px;color:var(--muted)}
+@media(max-width:640px){.fg{grid-template-columns:1fr}.hide-sm{display:none}}
+@media print{header,.tabs,.bar,.note,.selbar{display:none!important}.sec,.kpi{box-shadow:none;break-inside:avoid}body{background:#fff}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Physical Verification</h1><small id="scope">College stock · teams · reports</small></div>
+  <div class="sp"></div>
+  <select id="ses" title="Session" onchange="load(this.value)"></select>
+  <a class="tb" id="bookLink" href="#" target="_blank" rel="noopener" style="display:none">Sheet</a>
+  <a class="tb" href="./">← App</a>
+</header>
+<div class="wrap">
+  <div class="tabs">
+    <button id="t_status" class="on" onclick="tab('status')">Teams &amp; status</button>
+    <button id="t_stock" onclick="tab('stock')">Stock lists</button>
+    <button id="t_reports" onclick="tab('reports')">Reports</button>
+    <button id="t_log" onclick="tab('log')">Changes</button>
+  </div>
+  <div class="status" id="st"></div>
+
+  <!-- TEAMS & STATUS -->
+  <div id="v_status">
+    <div id="seedBox"></div>
+    <div id="k_status" class="kpis"></div>
+    <div class="bar">
+      <select id="stF" onchange="drawStatus()"><option value="">All areas</option><option>Pending</option><option>Received</option><option>Returned for correction</option></select>
+      <input id="stQ" class="grow" placeholder="Search area or team member…" oninput="drawStatus()">
+      <button class="btn p" onclick="areaDlg()">+ Area / lab</button>
+      <button class="btn" onclick="sessionDlg()">New session</button>
+    </div>
+    <div id="o_status"></div>
+  </div>
+
+  <!-- STOCK -->
+  <div id="v_stock" class="hidden">
+    <div class="bar">
+      <select id="aF" class="grow" onchange="fillLocs();PAGE=1;drawStock()"></select>
+      <select id="lF" class="grow" onchange="PAGE=1;drawStock()"></select>
+      <select id="cF" onchange="PAGE=1;drawStock()"></select>
+      <select id="kF" onchange="PAGE=1;drawStock()">
+        <option value="">Active items</option><option value="bad">Broken / missing / out of order</option><option value="used">Used / consumed / finished</option>
+        <option value="removed">Removed (written off)</option><option value="all">All, also removed</option></select>
+      <input id="q" class="grow" placeholder="Search item, reg / page, remarks…" oninput="deb(() => { PAGE = 1; drawStock(); })">
+    </div>
+    <div class="bar">
+      <button class="btn p" onclick="itemDlg()">+ Add item</button>
+      <button class="btn" onclick="pasteDlg()">+ Add many (paste)</button>
+      <button class="btn" id="selBtn" onclick="toggleSel()">Select</button>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn" onclick="rep('register', $('aF').value)">PDF of this list</button>
+    </div>
+    <div id="k_stock" class="kpis"></div>
+    <div id="o_stock"></div>
+    <div id="selbar" class="selbar hidden"></div>
+  </div>
+
+  <!-- REPORTS -->
+  <div id="v_reports" class="hidden">
+    <div class="note">Every report opens as a PDF (black &amp; white, low ink) with an Excel copy in the same panel. Reports use the session chosen at the top.</div>
+    <div class="rgrid" id="o_reports"></div>
+  </div>
+
+  <!-- LOG -->
+  <div id="v_log" class="hidden">
+    <div class="bar">
+      <input id="logQ" class="grow" placeholder="Search the changes…" oninput="drawLog()">
+      <button class="btn" onclick="loadLog()">Refresh</button>
+      <button class="btn p" onclick="rep('log')">PDF</button>
+    </div>
+    <div id="o_log"><div class="empty"><b>Changes</b>Every area, status and item change is written here with who and when.</div></div>
+  </div>
+</div>
+<dialog id="dlg"><div class="in" id="dlgIn"></div></dialog>
+<datalist id="dlLoc"></datalist><datalist id="dlCat"></datalist><datalist id="dlUnit"></datalist>
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbzl-DwgASIhf-pIGYi9D3M-CGOm7d7-UKg0W-OoWAiuRBHe4mjlRgMQXIHuLm6zi--i/exec';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ls = { get(k, d){ try{ const v = localStorage.getItem('csa2_' + k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } } };
+const user = ls.get('user', ''), pass = ls.get('pass', '');
+const CATS = ['Furniture & fixtures', 'Electrical & appliances', 'Computer & IT', 'Lab apparatus', 'Chemicals', 'Stationery', 'Crockery', 'Medicines', 'Medical equipment', 'Books & library', 'Other'];
+const CONDS = ['', 'Good', 'Broken', 'Missing', 'Out of order', 'Not in use', 'Consumed', 'Finished'];
+const REASONS = ['Written off (broken / unserviceable)', 'Condemned', 'Consumed / used up', 'Lost / missing', 'Transferred to another area', 'Returned to the university / donor', 'Wrong entry', 'Other'];
+const BAD = /^(broken|missing|out of order)$/i, USED = /^(consumed|finished)$/i;
+let D = null, LOG = null, MODE = 'status', PAGE = 1, SEL = null;
+const PER = 400;
+let debT = null; function deb(fn){ clearTimeout(debT); debT = setTimeout(fn, 250); }
+
+async function api(payload){
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 330000);
+  try{
+    const r = await fetch(API, { method: 'POST', body: JSON.stringify({ username: user, password: pass, ...payload }), signal: ctl.signal, redirect: 'follow' });
+    const txt = await r.text(); let j; try{ j = JSON.parse(txt); }catch(e){ throw new Error('The server sent a web page instead of data. Check the deployment.'); }
+    if(j && j.error === 'UNKNOWN_ACTION') throw new Error('The server does not have the Physical verification part yet (PhysicalVerification.gs). Wait a minute for the automatic update, then reload.');
+    if(j && j.error === 'BAD_LOGIN') throw new Error('Your saved login was refused. Open the app, sign out and sign in again.');
+    if(j && j.ok === false) throw new Error(j.error || 'Server error');
+    return j;
+  }catch(e){
+    if(e.name === 'AbortError') throw new Error('The server took too long. Try again.');
+    if(e instanceof TypeError) throw new Error(navigator.onLine ? 'The Apps Script server did not answer. Try again in a minute.' : 'No internet.');
+    throw e;
+  }finally{ clearTimeout(t); }
+}
+function say(kind, text){ const el = $('st'); el.className = 'status show' + (kind === 'busy' ? '' : ' ' + kind); el.innerHTML = (kind === 'busy' ? '<div class="spin"></div>' : '') + '<span></span>'; el.lastChild.textContent = text; if (kind === 'ok') setTimeout(() => { if (el.lastChild && el.lastChild.textContent === text) hush(); }, 5000); }
+function hush(){ $('st').className = 'status'; }
+
+/* ---------- numbers: "12", "10+10", "1,500" are numbers; "4.3 dozen" is text ---------- */
+function num(v){ v = String(v == null ? '' : v).replace(/,/g, '').trim(); if (!v) return null; if (/^\d+(\.\d+)?(\s*\+\s*\d+(\.\d+)?)*$/.test(v)) return v.split('+').reduce((a, x) => a + Number(x), 0); return null; }
+function remainOf(t, u, f){ const T = num(t); if (T === null) return ''; return String(Math.round((T - (num(u) || 0) - (num(f) || 0)) * 100) / 100); }
+const fmt = n => n == null ? '' : (Math.round(n * 100) / 100).toLocaleString('en-US');
+
+/* ---------- data ---------- */
+const AK = ['id', 'ses', 'sno', 'name', 'team', 'status', 'recv', 'docs', 'rem', 'by', 'at'];
+const IK = ['id', 'ses', 'area', 'loc', 'cat', 'name', 'reg', 'total', 'used', 'faulty', 'remain', 'unit', 'cond', 'rem', 'state', 'remOn', 'remBy', 'why', 'addBy', 'addOn', 'upBy', 'upAt'];
+const obj = (keys, r) => { const o = {}; keys.forEach((k, i) => o[k] = r[i] == null ? '' : String(r[i])); return o; };
+const areaOf = id => D.areas.find(a => a.id === id) || { name: '?', team: '' };
+const sortAreas = L => L.slice().sort((a, b) => (Number(a.sno) || 999) - (Number(b.sno) || 999) || a.name.localeCompare(b.name));
+const natural = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+function itemKind(it){ if (it.state === 'Removed') return 'removed'; if (BAD.test(it.cond) || (num(it.faulty) || 0) > 0) return 'bad'; if (USED.test(it.cond) || (num(it.used) || 0) > 0) return 'used'; return 'ok'; }
+function areaStats(a){
+  const L = D.items.filter(i => i.area === a.id), act = L.filter(i => i.state !== 'Removed');
+  return { items: act.length, bad: act.filter(i => itemKind(i) === 'bad').length, removed: L.length - act.length, locs: new Set(act.map(i => i.loc)).size };
+}
+
+async function load(session){
+  say('busy', 'Reading the physical verification lists…');
+  try{
+    const r = await api({ action: 'pv_load', session: session || '' });
+    D = { session: r.session, current: r.current, sessions: r.sessions, book: r.book, seedReady: r.seedReady, seedSession: r.seedSession,
+          areas: r.areas.map(x => obj(AK, x)), items: r.items.map(x => obj(IK, x)) };
+    LOG = null;
+    $('ses').innerHTML = D.sessions.map(s => '<option' + (s === D.session ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
+    $('scope').textContent = 'Session ' + D.session + (D.session === D.current ? ' (current)' : '') + ' · ' + D.areas.length + ' areas · ' + D.items.filter(i => i.state !== 'Removed').length + ' items';
+    if (D.book) { $('bookLink').href = D.book; $('bookLink').style.display = ''; }
+    hush(); fillFilters(); draw();
+  }catch(e){ say('err', e.message); }
+}
+function draw(){ if (!D) return; if (MODE === 'status') drawStatus(); else if (MODE === 'stock') drawStock(); else if (MODE === 'reports') drawReports(); else drawLog(); }
+function tab(w){
+  MODE = w; ['status', 'stock', 'reports', 'log'].forEach(k => { $('t_' + k).classList.toggle('on', k === w); $('v_' + k).classList.toggle('hidden', k !== w); });
+  if (w === 'log' && !LOG) loadLog(); else draw();
+}
+
+/* ---------------- TEAMS & STATUS ---------------- */
+function drawStatus(){
+  if (!D) return;
+  const A = sortAreas(D.areas), rec = A.filter(a => a.status === 'Received').length, act = D.items.filter(i => i.state !== 'Removed');
+  $('seedBox').innerHTML = D.seedReady ? '<div class="sec"><h3><span>Start with the lists already in Drive</span></h3><div class="sub">The folder <b>Physical verification / 2026</b> has the status sheet and every team\'s document for <b>' + esc(D.seedSession) +
+    '</b> (11 areas, about 1,100 items: labs, library, exam stationery, sick room, college furniture room by room, computer equipment). Load them once, then add, change or remove items here.<div style="margin-top:10px"><button class="btn p" onclick="seed()">Load the ' + esc(D.seedSession) + ' lists</button></div></div></div>' : '';
+  $('k_status').innerHTML =
+    '<div class="kpi"><b>' + A.length + '</b><span>areas / labs</span></div>' +
+    '<div class="kpi pos"><b>' + rec + '</b><span>verification received</span></div>' +
+    '<div class="kpi mid"><b>' + (A.length - rec) + '</b><span>pending</span></div>' +
+    '<div class="kpi"><b>' + act.length.toLocaleString() + '</b><span>items in the lists</span></div>' +
+    '<div class="kpi neg"><b>' + act.filter(i => itemKind(i) === 'bad').length + '</b><span>broken / missing / out of order</span></div>' +
+    '<div class="kpi"><b>' + D.items.filter(i => i.state === 'Removed').length + '</b><span>removed (written off)</span></div>';
+  const f = $('stF').value, q = $('stQ').value.trim().toLowerCase();
+  const L = A.filter(a => (!f || a.status === f) && (!q || (a.name + ' ' + a.team + ' ' + a.rem).toLowerCase().includes(q)));
+  if (!A.length) { $('o_status').innerHTML = '<div class="empty"><b>No areas in ' + esc(D.session) + '</b>Tap <i>+ Area / lab</i> to add one, or <i>New session</i> to copy last session\'s areas and stock.</div>'; return; }
+  $('o_status').innerHTML = '<div class="sec"><h3><span>Duty list of physical verification · session ' + esc(D.session) + '</span><span class="pill">' + L.length + ' of ' + A.length + '</span></h3><div class="scroll"><table><thead><tr><th>S.No</th><th>Area / Lab</th><th>Team</th><th>Status</th><th>Received on</th><th>Items</th><th>Broken / missing</th><th>Documents</th><th></th></tr></thead><tbody>' +
+    L.map(a => { const s = areaStats(a), docs = a.docs.split(/\s*\n\s*/).filter(Boolean);
+      return '<tr><td>' + esc(a.sno) + '</td><td class="l"><b>' + esc(a.name) + '</b>' + (a.rem ? '<div class="pill">' + esc(a.rem) + '</div>' : '') + '</td><td class="l team">' + esc(a.team) + '</td>' +
+        '<td><select onchange="quickStatus(\'' + a.id + '\', this.value)" style="height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface)">' +
+        ['Pending', 'Received', 'Returned for correction'].map(x => '<option' + (x === a.status ? ' selected' : '') + '>' + x + '</option>').join('') + '</select></td>' +
+        '<td>' + esc(a.recv) + '</td><td><a href="#" onclick="openArea(\'' + a.id + '\');return false"><b>' + s.items + '</b></a>' + (s.locs > 1 ? '<div class="pill">' + s.locs + ' places</div>' : '') + '</td>' +
+        '<td>' + (s.bad ? '<span class="tag bad">' + s.bad + '</span>' : '–') + '</td>' +
+        '<td class="docs">' + (docs.length ? docs.map((u, i) => '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + (docs.length > 1 ? 'Doc ' + (i + 1) : 'Open') + '</a>').join('') : '<span class="pill">—</span>') + '</td>' +
+        '<td><button class="btn sm" onclick="areaDlg(\'' + a.id + '\')">Edit</button></td></tr>'; }).join('') + '</tbody></table></div></div>';
+}
+function openArea(id){ tab('stock'); $('aF').value = id; fillLocs(); PAGE = 1; drawStock(); }
+async function quickStatus(id, st){
+  const a = D.areas.find(x => x.id === id); if (!a) return;
+  say('busy', 'Saving the status of ' + a.name + '…');
+  try{ const r = await api({ action: 'pv_area_save', area: { ...a, session: a.ses, status: st, recv: st === 'Received' ? a.recv : '', remarks: a.rem } }); Object.assign(a, obj(AK, r.area)); say('ok', a.name + ': ' + st + '.'); drawStatus(); }
+  catch(e){ say('err', e.message); drawStatus(); }
+}
+const toIso = d => { const m = String(d || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : ''; };
+const fromIso = d => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; };
+function areaDlg(id){
+  const a = id ? D.areas.find(x => x.id === id) : { id: '', sno: '', name: '', team: '', status: 'Pending', recv: '', docs: '', rem: '' }, s = id ? areaStats(a) : null;
+  $('dlgIn').innerHTML = '<h3>' + (id ? 'Edit ' + esc(a.name) : 'New area / lab') + '</h3><div class="fg">' +
+    '<label>S.No<input id="f_sno" inputmode="numeric" value="' + esc(a.sno) + '" placeholder="next number"></label>' +
+    '<label>Area / lab<input id="f_name" value="' + esc(a.name) + '" placeholder="e.g. GEOGRAPHY LAB"></label>' +
+    '<label class="w">Team (one name per line)<textarea id="f_team" rows="4">' + esc(a.team) + '</textarea></label>' +
+    '<label>Status<select id="f_status">' + ['Pending', 'Received', 'Returned for correction'].map(x => '<option' + (x === a.status ? ' selected' : '') + '>' + x + '</option>').join('') + '</select></label>' +
+    '<label>Received on<input id="f_recv" type="date" value="' + toIso(a.recv) + '"></label>' +
+    '<label class="w">Documents (Drive links, one per line)<textarea id="f_docs" rows="2">' + esc(a.docs) + '</textarea></label>' +
+    '<label class="w">Remarks<textarea id="f_rem" rows="2">' + esc(a.rem) + '</textarea></label></div>' +
+    '<div class="dacts">' + (id ? '<button class="btn no left" onclick="areaDel(\'' + id + '\')">Delete area' + (s.items + s.removed ? ' + its ' + (s.items + s.removed) + ' items' : '') + '</button>' : '') +
+    '<button class="btn" onclick="$(\'dlg\').close()">Cancel</button><button class="btn p" onclick="areaSave(\'' + (id || '') + '\')">Save</button></div>';
+  $('dlg').showModal();
+}
+async function areaSave(id){
+  const area = { id, session: D.session, sno: $('f_sno').value, name: $('f_name').value, team: $('f_team').value, status: $('f_status').value, recv: fromIso($('f_recv').value), docs: $('f_docs').value, remarks: $('f_rem').value };
+  try{
+    const r = await api({ action: 'pv_area_save', area }), o = obj(AK, r.area), old = D.areas.find(x => x.id === o.id);
+    if (old) Object.assign(old, o); else D.areas.push(o);
+    $('dlg').close(); say('ok', o.name + ' saved.'); fillFilters(); draw();
+  }catch(e){ alert(e.message); }
+}
+async function areaDel(id){
+  const a = D.areas.find(x => x.id === id), n = D.items.filter(i => i.area === id).length;
+  if (!confirm('Delete ' + a.name + (n ? ' and its ' + n + ' items' : '') + ' from ' + D.session + '? This cannot be undone.')) return;
+  try{ await api({ action: 'pv_area_delete', id }); D.areas = D.areas.filter(x => x.id !== id); D.items = D.items.filter(i => i.area !== id); $('dlg').close(); say('ok', a.name + ' deleted.'); fillFilters(); draw(); }
+  catch(e){ alert(e.message); }
+}
+function nextSes(s){ const m = String(s).match(/^(\d{4})-(\d{2})$/); return m ? (Number(m[1]) + 1) + '-' + String(Number(m[1]) + 2).slice(2) : ''; }
+function sessionDlg(){
+  $('dlgIn').innerHTML = '<h3>New session</h3><div class="note" style="margin:0 0 10px">The same areas and teams are copied with status <b>Pending</b>. With the box ticked every active item comes too, and what was <b>remaining</b> at the end of ' + esc(D.session) +
+    ' becomes the new <b>total</b> (items used up or finished are left out). ' + esc(D.session) + ' stays as it is.</div><div class="fg">' +
+    '<label>Copy from<select id="f_from">' + D.sessions.map(s => '<option' + (s === D.session ? ' selected' : '') + '>' + esc(s) + '</option>').join('') + '</select></label>' +
+    '<label>New session<input id="f_to" value="' + esc(nextSes(D.session)) + '" placeholder="2026-27"></label>' +
+    '<label class="w" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input id="f_copy" type="checkbox" checked style="height:auto"> Copy the items (stock carried forward)</label></div>' +
+    '<div class="dacts"><button class="btn" onclick="$(\'dlg\').close()">Cancel</button><button class="btn p" onclick="sessionNew()">Make the session</button></div>';
+  $('dlg').showModal();
+}
+async function sessionNew(){
+  const from = $('f_from').value, to = $('f_to').value.trim(), copyItems = $('f_copy').checked;
+  if (!confirm('Make session ' + to + ' from ' + from + (copyItems ? ' with its stock' : '') + '?')) return;
+  $('dlg').close(); say('busy', 'Making session ' + to + '…');
+  try{ const r = await api({ action: 'pv_session_new', from, to, copyItems }); say('ok', 'Session ' + to + ': ' + r.areas + ' areas, ' + r.items + ' items.'); load(to); }
+  catch(e){ say('err', e.message); }
+}
+async function seed(){
+  if (!confirm('Load the ' + D.seedSession + ' lists from the Drive folder (11 areas with their teams and about 1,100 items)?')) return;
+  say('busy', 'Loading the ' + D.seedSession + ' lists… this takes a few seconds.');
+  try{ const r = await api({ action: 'pv_seed' }); say('ok', r.areas + ' areas and ' + r.items + ' items loaded.'); load(r.session); }
+  catch(e){ say('err', e.message); }
+}
+
+/* ---------------- STOCK ---------------- */
+function fillFilters(){
+  const A = sortAreas(D.areas), keepA = $('aF').value, keepC = $('cF').value;
+  $('aF').innerHTML = '<option value="">All areas (' + A.length + ')</option>' + A.map(a => '<option value="' + a.id + '">' + esc(a.name) + '</option>').join('');
+  if (A.some(a => a.id === keepA)) $('aF').value = keepA;
+  const cats = [...new Set(CATS.concat(D.items.map(i => i.cat)).filter(Boolean))];
+  $('cF').innerHTML = '<option value="">All categories</option>' + cats.map(c => '<option>' + esc(c) + '</option>').join(''); $('cF').value = cats.includes(keepC) ? keepC : '';
+  $('dlCat').innerHTML = cats.map(c => '<option value="' + esc(c) + '">').join('');
+  $('dlUnit').innerHTML = [...new Set(['packets', 'boxes', 'dozen', 'rolls', 'bottles', 'ml', 'g', 'kg', 'L'].concat(D.items.map(i => i.unit)).filter(Boolean))].map(u => '<option value="' + esc(u) + '">').join('');
+  fillLocs();
+}
+function locsOf(areaId){ return [...new Set(D.items.filter(i => !areaId || i.area === areaId).map(i => i.loc).filter(Boolean))].sort(natural); }
+function fillLocs(){
+  const keep = $('lF').value, L = locsOf($('aF').value);
+  $('lF').innerHTML = '<option value="">All places (' + L.length + ')</option>' + L.map(l => '<option>' + esc(l) + '</option>').join('');
+  if (L.includes(keep)) $('lF').value = keep;
+}
+function stockRows(){
+  if (!D) return [];
+  const a = $('aF').value, l = $('lF').value, c = $('cF').value, k = $('kF').value, q = $('q').value.trim().toLowerCase();
+  return D.items.filter(i => {
+    const kind = itemKind(i);
+    if (k === '' && kind === 'removed') return false;
+    if (k === 'bad' && kind !== 'bad') return false;
+    if (k === 'used' && kind !== 'used') return false;
+    if (k === 'removed' && kind !== 'removed') return false;
+    return (!a || i.area === a) && (!l || i.loc === l) && (!c || i.cat === c) && (!q || (i.name + ' ' + i.reg + ' ' + i.rem + ' ' + i.loc + ' ' + i.why).toLowerCase().includes(q));
+  });
+}
+function grouped(rows){
+  const order = {}; sortAreas(D.areas).forEach((a, i) => order[a.id] = i);
+  const G = {};
+  rows.forEach(i => { const key = i.area + '\u0001' + (i.loc || ''); (G[key] = G[key] || []).push(i); });
+  const first = {}; D.items.forEach((i, n) => { const key = i.area + '\u0001' + (i.loc || ''); if (first[key] == null) first[key] = n; });   // places keep the order of the team's document
+  return Object.keys(G).sort((x, y) => ((order[x.split('\u0001')[0]] ?? 999) - (order[y.split('\u0001')[0]] ?? 999)) || (first[x] - first[y]))
+    .map(k => { const [area, loc] = k.split('\u0001'); return { area, loc, rows: G[k] }; });
+}
+function condTag(i){
+  if (i.state === 'Removed') return '<span class="tag gone">Removed</span>';
+  if (!i.cond) return (num(i.faulty) || 0) > 0 ? '<span class="tag bad">Broken / missing</span>' : '';
+  return '<span class="tag ' + (BAD.test(i.cond) ? 'bad' : USED.test(i.cond) ? 'used' : 'gone') + '">' + esc(i.cond) + '</span>';
+}
+function drawStock(){
+  if (!D) return;
+  const rows = stockRows(), act = rows.filter(i => i.state !== 'Removed');
+  const sumT = act.reduce((s, i) => s + (num(i.total) || 0), 0), bad = act.filter(i => itemKind(i) === 'bad');
+  $('k_stock').innerHTML = '<div class="kpi"><b>' + rows.length.toLocaleString() + '</b><span>rows shown</span></div>' +
+    '<div class="kpi"><b>' + fmt(sumT) + '</b><span>total pieces (numbers only)</span></div>' +
+    '<div class="kpi neg"><b>' + bad.length + '</b><span>rows with broken / missing</span></div>' +
+    '<div class="kpi neg"><b>' + fmt(act.reduce((s, i) => s + (num(i.faulty) || 0), 0)) + '</b><span>pieces broken / missing</span></div>';
+  if (!D.areas.length) { $('o_stock').innerHTML = '<div class="empty"><b>No areas yet</b>Add an area on the Teams &amp; status tab first.</div>'; return; }
+  if (!rows.length) { $('o_stock').innerHTML = '<div class="empty"><b>Nothing here</b>No item matches this choice. Tap <i>+ Add item</i> to add one.</div>'; drawSelBar(); return; }
+  const shown = rows.slice(0, PAGE * PER), groups = grouped(shown), sel = !!SEL, all = $('aF').value === '';
+  $('o_stock').innerHTML = groups.map(g => {
+    const a = areaOf(g.area);
+    return '<div class="sec"><h3><span>' + (all ? esc(a.name) + ' · ' : '') + esc(g.loc || '(no place written)') + '</span><span class="pill">' + g.rows.length + ' item(s)' +
+      (sel ? ' · <a href="#" onclick="selGroup(\'' + g.area + '\',' + JSON.stringify(g.loc).replace(/"/g, '&quot;') + ');return false">select all</a>' : '') + '</span></h3><div class="scroll"><table><thead><tr>' +
+      (sel ? '<th></th>' : '') + '<th>#</th><th>Item</th><th class="hide-sm">Category</th><th>Reg / Page</th><th>Total</th><th>Used</th><th>Broken / Missing</th><th>Remaining</th><th>Unit</th><th>Condition</th><th>Remarks</th>' + (sel ? '' : '<th></th>') + '</tr></thead><tbody>' +
+      g.rows.map((i, n) => '<tr class="' + (i.state === 'Removed' ? 'off' : '') + (sel && SEL.has(i.id) ? ' sel' : '') + '"' + (sel ? ' onclick="selOne(\'' + i.id + '\')" style="cursor:pointer"' : '') + '>' +
+        (sel ? '<td class="keep"><input type="checkbox" ' + (SEL.has(i.id) ? 'checked' : '') + ' onclick="event.stopPropagation();selOne(\'' + i.id + '\')"></td>' : '') +
+        '<td>' + (n + 1) + '</td><td class="l"><b>' + esc(i.name) + '</b></td><td class="hide-sm l pill">' + esc(i.cat) + '</td><td>' + esc(i.reg) + '</td><td><b>' + esc(i.total) + '</b></td><td>' + esc(i.used) + '</td>' +
+        '<td>' + ((num(i.faulty) || 0) > 0 || (i.faulty && num(i.faulty) === null) ? '<b style="color:var(--neg)">' + esc(i.faulty) + '</b>' : esc(i.faulty)) + '</td><td>' + esc(i.remain) + '</td><td>' + esc(i.unit) + '</td>' +
+        '<td class="keep">' + condTag(i) + '</td><td class="l pill keep">' + esc(i.rem) + (i.state === 'Removed' ? '<div><b>Removed ' + esc(i.remOn.slice(0, 10)) + ':</b> ' + esc(i.why) + '</div>' : '') + '</td>' +
+        (sel ? '' : '<td class="keep"><button class="btn sm" onclick="itemDlg(\'' + i.id + '\')">Edit</button></td>') + '</tr>').join('') +
+      '</tbody></table></div></div>';
+  }).join('') + (shown.length < rows.length ? '<div style="text-align:center;margin:10px 0"><button class="btn" onclick="PAGE++;drawStock()">Show more (' + (rows.length - shown.length) + ' left)</button></div>' : '');
+  drawSelBar();
+}
+/* selection: remove / restore / delete many */
+function toggleSel(){ SEL = SEL ? null : new Set(); $('selBtn').textContent = SEL ? 'Done selecting' : 'Select'; $('selBtn').classList.toggle('p', !!SEL); drawStock(); }
+function selOne(id){ if (!SEL) return; SEL.has(id) ? SEL.delete(id) : SEL.add(id); drawStock(); }
+function selGroup(area, loc){ const L = stockRows().filter(i => i.area === area && (i.loc || '') === loc), on = L.every(i => SEL.has(i.id)); L.forEach(i => on ? SEL.delete(i.id) : SEL.add(i.id)); drawStock(); }
+function drawSelBar(){
+  const b = $('selbar'); if (!SEL) { b.classList.add('hidden'); return; }
+  const L = D.items.filter(i => SEL.has(i.id)), rem = L.filter(i => i.state === 'Removed').length, act = L.length - rem;
+  b.classList.remove('hidden');
+  b.innerHTML = '<b>' + L.length + ' selected</b><span style="flex:1"></span>' +
+    '<button class="btn sm" onclick="SEL=new Set(stockRows().map(i=>i.id));drawStock()">Select all shown</button><button class="btn sm" onclick="SEL.clear();drawStock()">Clear</button>' +
+    (act ? '<button class="btn sm no" onclick="removeDlg([...SEL].filter(id=>D.items.find(i=>i.id===id&&i.state!==\'Removed\')))">Remove ' + act + '</button>' : '') +
+    (rem ? '<button class="btn sm ok" onclick="restore([...SEL])">Restore ' + rem + '</button><button class="btn sm no" onclick="delForGood([...SEL])">Delete ' + rem + ' for good</button>' : '');
+}
+function setLocList(areaId){ $('dlLoc').innerHTML = locsOf(areaId).map(l => '<option value="' + esc(l) + '">').join(''); }
+function itemDlg(id, again){
+  const blank = { id: '', area: $('aF').value || (again && again.area) || '', loc: $('lF').value || (again && again.loc) || '', cat: (again && again.cat) || $('cF').value || '', name: '', reg: '', total: '', used: '', faulty: '', unit: '', cond: '', rem: '' };
+  const i = id ? D.items.find(x => x.id === id) : blank;
+  setLocList(i.area);
+  $('dlgIn').innerHTML = '<h3>' + (id ? 'Edit item' : 'Add an item') + '</h3><div class="fg">' +
+    '<label>Area / lab<select id="i_area" onchange="setLocList(this.value)">' + sortAreas(D.areas).map(a => '<option value="' + a.id + '"' + (a.id === i.area ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('') + '</select></label>' +
+    '<label>Place (room / store / office)<input id="i_loc" list="dlLoc" value="' + esc(i.loc) + '" placeholder="e.g. Room 5, Store 1"></label>' +
+    '<label class="w">Item<input id="i_name" value="' + esc(i.name) + '" placeholder="e.g. Student chairs"></label>' +
+    '<label>Category<input id="i_cat" list="dlCat" value="' + esc(i.cat) + '"></label>' +
+    '<label>Reg / page no<input id="i_reg" value="' + esc(i.reg) + '" placeholder="e.g. P. 45"></label>' +
+    '<label>Total<input id="i_total" value="' + esc(i.total) + '" inputmode="decimal" oninput="calcRem()"></label>' +
+    '<label>Unit<input id="i_unit" list="dlUnit" value="' + esc(i.unit) + '" placeholder="pieces if empty"></label>' +
+    '<label>Used / consumed<input id="i_used" value="' + esc(i.used) + '" inputmode="decimal" oninput="calcRem()"></label>' +
+    '<label>Broken / missing<input id="i_faulty" value="' + esc(i.faulty) + '" inputmode="decimal" oninput="calcRem()"></label>' +
+    '<label>Remaining (worked out)<input id="i_remain" value="' + esc(id ? i.remain : '') + '" placeholder="only if Total is not a number"></label>' +
+    '<label>Condition<select id="i_cond">' + CONDS.map(c => '<option value="' + c + '"' + (c === i.cond ? ' selected' : '') + '>' + (c || '—') + '</option>').join('') + '</select></label>' +
+    '<label class="w">Remarks<textarea id="i_rem" rows="2">' + esc(i.rem) + '</textarea></label></div>' +
+    (id && i.state === 'Removed' ? '<div class="note" style="margin:10px 0 0">Removed on ' + esc(i.remOn) + ' by ' + esc(i.remBy) + ': ' + esc(i.why) + '</div>' : '') +
+    (id ? '<div class="pill" style="margin-top:8px">Added by ' + esc(i.addBy) + ' on ' + esc(i.addOn) + (i.upAt && i.upAt !== i.addOn ? ' · last change by ' + esc(i.upBy) + ' on ' + esc(i.upAt) : '') + '</div>' : '') +
+    '<div class="dacts">' + (id ? (i.state === 'Removed' ? '<button class="btn ok left" onclick="restore([\'' + id + '\'])">Restore</button><button class="btn no" onclick="delForGood([\'' + id + '\'])">Delete for good</button>'
+      : '<button class="btn no left" onclick="removeDlg([\'' + id + '\'])">Remove…</button>') : '') +
+    '<button class="btn" onclick="$(\'dlg\').close()">Cancel</button>' + (id ? '' : '<button class="btn" onclick="itemSave(\'\', true)">Save &amp; add another</button>') +
+    '<button class="btn p" onclick="itemSave(\'' + (id || '') + '\')">Save</button></div>';
+  $('dlg').showModal(); calcRem(); setTimeout(() => $(id ? 'i_total' : (i.loc ? 'i_name' : 'i_loc')).focus(), 50);
+}
+function calcRem(){ const r = remainOf($('i_total').value, $('i_used').value, $('i_faulty').value); if (num($('i_total').value) !== null) { $('i_remain').value = r; $('i_remain').readOnly = true; } else $('i_remain').readOnly = false; }
+async function itemSave(id, again){
+  const x = { id, area: $('i_area').value, loc: $('i_loc').value.trim(), cat: $('i_cat').value.trim(), name: $('i_name').value.trim(), reg: $('i_reg').value.trim(), total: $('i_total').value.trim(),
+    used: $('i_used').value.trim(), faulty: $('i_faulty').value.trim(), remain: $('i_remain').value.trim(), unit: $('i_unit').value.trim(), cond: $('i_cond').value, rem: $('i_rem').value.trim() };
+  if (!x.name) { alert('Write the item name.'); return; }
+  try{
+    const r = await api({ action: 'pv_items_save', items: [x] }); mergeItems(r.items);
+    say('ok', x.name + (id ? ' saved.' : ' added to ' + areaOf(x.area).name + (x.loc ? ' · ' + x.loc : '') + '.'));
+    fillFilters(); drawStock();
+    if (again) itemDlg('', { area: x.area, loc: x.loc, cat: x.cat }); else $('dlg').close();
+  }catch(e){ alert(e.message); }
+}
+function mergeItems(rows){ rows.forEach(r => { const o = obj(IK, r), old = D.items.find(i => i.id === o.id); if (old) Object.assign(old, o); else D.items.push(o); }); }
+function removeDlg(ids){
+  if (!ids.length) return;
+  const L = D.items.filter(i => ids.includes(i.id));
+  $('dlgIn').innerHTML = '<h3>Remove ' + (L.length === 1 ? esc(L[0].name) : L.length + ' items') + '</h3><div class="note" style="margin:0 0 10px">Removed items stay in the record (crossed out) with the reason and date, and appear in the <b>Removed / written-off</b> report. You can restore them any time.</div>' +
+    '<div class="fg"><label class="w">Reason<select id="r_why">' + REASONS.map(r => '<option>' + r + '</option>').join('') + '</select></label><label class="w">Details (optional)<input id="r_note" placeholder="e.g. condemnation committee 12/05/2026, sent to Physics lab"></label></div>' +
+    '<div class="dacts"><button class="btn" onclick="$(\'dlg\').close()">Cancel</button><button class="btn no" id="r_go">Remove</button></div>';
+  if (!$('dlg').open) $('dlg').showModal();
+  $('r_go').onclick = async () => {
+    const reason = $('r_why').value + ($('r_note').value.trim() ? ' — ' + $('r_note').value.trim() : '');
+    try{ const r = await api({ action: 'pv_items_remove', ids, reason }); mergeItems(r.items); $('dlg').close(); if (SEL) SEL.clear(); say('ok', r.items.length + ' item(s) removed: ' + reason); drawStock(); }
+    catch(e){ alert(e.message); }
+  };
+}
+async function restore(ids){
+  ids = ids.filter(id => D.items.some(i => i.id === id && i.state === 'Removed')); if (!ids.length) return;
+  try{ const r = await api({ action: 'pv_items_restore', ids }); mergeItems(r.items); if ($('dlg').open) $('dlg').close(); if (SEL) SEL.clear(); say('ok', r.items.length + ' item(s) restored.'); drawStock(); }
+  catch(e){ alert(e.message); }
+}
+async function delForGood(ids){
+  ids = ids.filter(id => D.items.some(i => i.id === id && i.state === 'Removed')); if (!ids.length) return;
+  if (!confirm('Delete ' + ids.length + ' removed item(s) for good? They will not be in any report any more.')) return;
+  try{ const r = await api({ action: 'pv_items_delete', ids }); D.items = D.items.filter(i => !r.deleted.includes(i.id)); if ($('dlg').open) $('dlg').close(); if (SEL) SEL.clear(); say('ok', r.deleted.length + ' item(s) deleted.'); fillFilters(); drawStock(); }
+  catch(e){ alert(e.message); }
+}
+/* paste many rows from Excel / Word: Item | Total | Used | Broken | Unit | Reg | Remarks (tab between columns) */
+function pasteDlg(){
+  $('dlLoc').innerHTML = locsOf($('aF').value).map(l => '<option value="' + esc(l) + '">').join('');
+  $('dlgIn').innerHTML = '<h3>Add many items</h3><div class="note" style="margin:0 0 10px">Copy rows from Excel or a Word table and paste them below. Columns in this order: <b>Item · Total · Used · Broken/Missing · Unit · Reg/Page · Remarks</b> (only Item is needed). One line without tabs such as <i>Student chairs 48</i> also works.</div><div class="fg">' +
+    '<label>Area / lab<select id="p_area">' + sortAreas(D.areas).map(a => '<option value="' + a.id + '"' + (a.id === $('aF').value ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('') + '</select></label>' +
+    '<label>Place<input id="p_loc" list="dlLoc" value="' + esc($('lF').value) + '"></label><label>Category<input id="p_cat" list="dlCat" value="' + esc($('cF').value) + '"></label><label>Condition for all<select id="p_cond">' + CONDS.map(c => '<option value="' + c + '">' + (c || '—') + '</option>').join('') + '</select></label>' +
+    '<label class="w">Rows<textarea id="p_txt" rows="9" oninput="pastePrev()" placeholder="Student chairs\t48\nFans\t6\t\t1"></textarea></label></div><div id="p_prev" class="pill" style="margin-top:6px"></div>' +
+    '<div class="dacts"><button class="btn" onclick="$(\'dlg\').close()">Cancel</button><button class="btn p" onclick="pasteSave()">Add the items</button></div>';
+  $('dlg').showModal();
+}
+function pasteRows(){
+  return $('p_txt').value.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim() && !/^\s*(s\.?\s*no|item|name|particulars|articles?)\b/i.test(l)).map(l => {
+    let c = l.split('\t').map(x => x.trim());
+    if (/^\d+[.)]?$/.test(c[0]) && c.length > 1) c = c.slice(1);                       // a serial number column
+    if (c.length === 1) { const m = c[0].match(/^(.*?)\s*[-–:=]?\s*(\d+(?:\.\d+)?)\s*([A-Za-z]*)$/); if (m && m[1]) c = [m[1], m[2], '', '', m[3]]; }
+    return { name: c[0] || '', total: c[1] || '', used: c[2] || '', faulty: c[3] || '', unit: c[4] || '', reg: c[5] || '', rem: c.slice(6).join(' ') };
+  }).filter(r => r.name);
+}
+function pastePrev(){ const R = pasteRows(); $('p_prev').innerHTML = R.length ? R.length + ' item(s): ' + R.slice(0, 6).map(r => '<b>' + esc(r.name) + '</b>' + (r.total ? ' ' + esc(r.total) : '')).join(' · ') + (R.length > 6 ? ' …' : '') : ''; }
+async function pasteSave(){
+  const R = pasteRows(); if (!R.length) { alert('Paste at least one row.'); return; }
+  const base = { area: $('p_area').value, loc: $('p_loc').value.trim(), cat: $('p_cat').value.trim(), cond: $('p_cond').value };
+  try{ const r = await api({ action: 'pv_items_save', items: R.map(x => ({ ...base, ...x })) }); mergeItems(r.items); $('dlg').close(); say('ok', r.added + ' item(s) added to ' + areaOf(base.area).name + '.'); fillFilters(); drawStock(); }
+  catch(e){ alert(e.message); }
+}
+
+/* ---------------- REPORTS ---------------- */
+const REPS = [
+  ['status', 'Duty list & status', 'Every area with its team, status (received / pending) and date, item and broken counts. Like the status sheet.', false],
+  ['register', 'Stock register (area-wise)', 'The full list of one area or all areas, place by place, with the team\'s signature lines under each area.', true],
+  ['place', 'Room / place list', 'Everything in one room or store (e.g. Room 5, Server Room) to paste on the door or check on the spot.', 'place'],
+  ['bad', 'Broken / missing / out of order', 'Every damaged, missing or out-of-order item of the college, area by area, for repair or write-off.', true],
+  ['used', 'Used / consumed', 'Stationery, chemicals and medicines used or finished in the session.', true],
+  ['removed', 'Removed / written-off items', 'Items taken off the stock this session with the date, who and the reason.', true],
+  ['summary', 'Summary', 'Totals by area and by category: rows, pieces, broken / missing, removed.', false],
+  ['pending', 'Pending reminder', 'Areas whose verification is still pending, with the team names (also as a WhatsApp message).', false],
+  ['log', 'Changes log', 'Who added, changed, removed or restored what, and when.', false]
+];
+function drawReports(){
+  const A = sortAreas(D.areas), opts = '<option value="">All areas</option>' + A.map(a => '<option value="' + a.id + '">' + esc(a.name) + '</option>').join('');
+  const places = [...new Set(D.items.filter(i => i.state !== 'Removed').map(i => areaOf(i.area).name + ' · ' + (i.loc || '—')))].sort(natural);
+  $('o_reports').innerHTML = REPS.map(r => '<div class="rcard"><h4>' + r[1] + '</h4><p>' + r[2] + '</p>' +
+    (r[3] === true ? '<select id="ra_' + r[0] + '">' + opts + '</select>' : r[3] === 'place' ? '<select id="ra_place">' + places.map(p => '<option>' + esc(p) + '</option>').join('') + '</select>' : '') +
+    '<div class="acts"><button class="btn p sm" onclick="rep(\'' + r[0] + '\')">PDF / Excel</button>' + (r[0] === 'pending' ? '<button class="btn sm" onclick="shareText(pendingText())">WhatsApp</button>' : '') +
+    (r[0] === 'status' ? '<button class="btn sm" onclick="shareText(statusText())">WhatsApp</button>' : '') + '</div></div>').join('');
+}
+function shareText(t){ if (navigator.share) navigator.share({ text: t }).catch(() => {}); else window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank'); }
+function statusText(){ return '*Physical verification ' + D.session + ' — status*\n' + sortAreas(D.areas).map(a => a.sno + '. ' + a.name + ': ' + (a.status === 'Received' ? '✅ Received' + (a.recv ? ' ' + a.recv : '') : '⏳ ' + a.status)).join('\n'); }
+function pendingText(){
+  const P = sortAreas(D.areas).filter(a => a.status !== 'Received');
+  return P.length ? '*Physical verification ' + D.session + '*\nThe verification of these areas is still pending. Kindly submit it to the office:\n\n' + P.map(a => '*' + a.name + '*\n' + a.team.split('\n').filter(Boolean).map(t => '  • ' + t).join('\n')).join('\n\n') : 'All areas have submitted their physical verification for ' + D.session + '.';
+}
+let LIBP = null;
+const addScript = src => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('The PDF tool could not load.')); document.head.appendChild(s); });
+function pdfLibs(){ if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable) return Promise.resolve(); if (!LIBP) LIBP = (window.jspdf ? Promise.resolve() : addScript('jspdf.umd.min.js')).then(() => window.jspdf.jsPDF.API.autoTable ? null : addScript('jspdf.plugin.autotable.min.js')).catch(e => { LIBP = null; throw e; }); return LIBP; }
+let LOGO = null;
+async function logo(){ if (LOGO !== null) return LOGO; try{ const b = await (await fetch('jcw-logo.png')).blob(); LOGO = await new Promise(ok => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(b); }); }catch(e){ LOGO = ''; } return LOGO; }
+/* one PDF: college header on page 1 only; parts = [{ title, note, head, body, cols, sign }] */
+async function makePdf(file, title, sub, parts, land){
+  await pdfLibs(); const lg = await logo();
+  const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: land ? 'landscape' : 'portrait', compress: true }), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  if (lg) try{ doc.addImage(lg, 'PNG', 10, 7, 16, 16, 'jcwlogo', 'FAST'); }catch(e){}
+  doc.setTextColor(0); doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('JINNAH COLLEGE FOR WOMEN', W / 2, 12, { align: 'center' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text('University of Peshawar', W / 2, 17, { align: 'center' });
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5); doc.text(title.toUpperCase(), W / 2, 23.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60); const sl = doc.splitTextToSize(sub, W - 24); doc.text(sl, W / 2, 28.5, { align: 'center' });
+  let y = 28.5 + sl.length * 3.6 + 2;
+  parts.forEach((p, pi) => {
+    if (p.newPage && pi) { doc.addPage(); y = 12; }
+    if (p.title) { if (y > H - 30) { doc.addPage(); y = 12; } doc.setTextColor(0); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.text(p.title, 10, y + 3); y += 5; }
+    if (p.note) { doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(70); const nl = doc.splitTextToSize(p.note, W - 20); doc.text(nl, 10, y + 2.5); y += nl.length * 3.3 + 1; }
+    if (p.body && p.body.length) {
+      doc.autoTable({ startY: y, head: [p.head], body: p.body, theme: 'grid', margin: { left: 8, right: 8, top: 10, bottom: 12 },
+        styles: { fontSize: 7.6, cellPadding: 0.9, lineColor: [120, 120, 120], lineWidth: 0.1, textColor: 0, overflow: 'linebreak', valign: 'top' },
+        headStyles: { fillColor: [107, 52, 35], textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 7.2 }, columnStyles: p.cols || {},
+        didParseCell: d => { if (d.section === 'body' && d.row.raw && d.row.raw._off) d.cell.styles.textColor = [110, 110, 110]; } });
+      y = doc.lastAutoTable.finalY + 4;
+    } else if (p.empty) { doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.setTextColor(90); doc.text(p.empty, 10, y + 3); y += 6; }
+    if (p.sign && p.sign.length) {
+      const names = p.sign, colW = (W - 20) / Math.min(3, names.length), rows = Math.ceil(names.length / 3);
+      if (y + rows * 14 + 6 > H - 12) { doc.addPage(); y = 14; }
+      doc.setTextColor(0); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text('Verified and found correct by:', 10, y + 4); y += 8;
+      names.forEach((n, k) => { const cx = 10 + (k % 3) * colW, cy = y + Math.floor(k / 3) * 14 + 8; doc.setDrawColor(0); doc.line(cx, cy, cx + colW - 8, cy); doc.setFontSize(8); doc.text(n, cx, cy + 4); });
+      y += rows * 14 + 4;
+    }
+    y += 3;
+  });
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(110); doc.text('Physical verification ' + D.session + ' · page ' + i + ' of ' + n + ' · printed ' + new Date().toLocaleDateString('en-GB'), W - 8, H - 5, { align: 'right' }); }
+  doc.save(file.replace(/[^\w\- ]+/g, '') + '.pdf');
+}
+const ICOLS = ['#', 'Item', 'Reg / Page', 'Total', 'Used', 'Broken / Missing', 'Remaining', 'Unit', 'Condition', 'Remarks'];
+const iRow = (i, n) => { const r = [n, i.name, i.reg, i.total, i.used, i.faulty, i.remain, i.unit, i.state === 'Removed' ? 'Removed' : i.cond, i.rem + (i.state === 'Removed' ? (i.rem ? ' · ' : '') + 'Removed ' + i.remOn.slice(0, 10) + ': ' + i.why : '')]; if (i.state === 'Removed') r._off = 1; return r; };
+const ICW = { 0: { cellWidth: 7, halign: 'center' }, 1: { cellWidth: 46 }, 2: { cellWidth: 17 }, 3: { cellWidth: 13, halign: 'center' }, 4: { cellWidth: 12, halign: 'center' }, 5: { cellWidth: 16, halign: 'center' }, 6: { cellWidth: 18, halign: 'center' }, 7: { cellWidth: 14 }, 8: { cellWidth: 18 } };
+const team = a => a.team.split(/\n/).map(s => s.trim()).filter(s => s && !/^lab\.?\s*staff$/i.test(s));
+async function rep(kind, areaArg){
+  if (!D) return;
+  const val = id => ($('ra_' + id) || {}).value || '';
+  const aSel = areaArg != null ? areaArg : val(kind), A = sortAreas(D.areas).filter(a => !aSel || a.id === aSel), aName = aSel ? areaOf(aSel).name : 'All areas';
+  say('busy', 'Making the PDF…');
+  try{
+    if (kind === 'status') {
+      await makePdf('Physical verification status ' + D.session, 'Duty list of physical verification for the session ' + D.session, 'Status on ' + new Date().toLocaleDateString('en-GB') + ' · ' +
+        D.areas.filter(a => a.status === 'Received').length + ' of ' + D.areas.length + ' received', [{ head: ['S.No', 'Area / Lab', 'Team', 'Status', 'Received on', 'Items', 'Broken / missing'],
+        body: sortAreas(D.areas).map(a => { const s = areaStats(a); return [a.sno, a.name, a.team, a.status.toUpperCase(), a.recv, s.items, s.bad || '']; }),
+        cols: { 0: { cellWidth: 11, halign: 'center' }, 1: { cellWidth: 42, fontStyle: 'bold' }, 2: { cellWidth: 58 }, 3: { cellWidth: 24, halign: 'center' }, 4: { cellWidth: 20, halign: 'center' }, 5: { halign: 'center' }, 6: { halign: 'center' } } }]);
+    } else if (kind === 'register' || kind === 'bad' || kind === 'used' || kind === 'removed') {
+      const pick = { register: i => i.state !== 'Removed', bad: i => itemKind(i) === 'bad', used: i => itemKind(i) === 'used', removed: i => i.state === 'Removed' }[kind];
+      const title = { register: 'Physical verification stock register', bad: 'Broken / missing / out of order items', used: 'Used / consumed items', removed: 'Removed / written-off items' }[kind];
+      const parts = []; let total = 0;
+      A.forEach((a, ai) => {
+        const L = D.items.filter(i => i.area === a.id && pick(i)); total += L.length;
+        if (!L.length && kind !== 'register') return;
+        const G = grouped(L);
+        parts.push({ title: a.sno + '. ' + a.name + ' — ' + L.length + ' item(s)', note: 'Team: ' + a.team.replace(/\n/g, ', ') + ' · Status: ' + a.status + (a.recv ? ' (' + a.recv + ')' : ''), newPage: kind === 'register' && ai > 0 && !aSel,
+          empty: L.length ? '' : 'No items written for this area yet.' });
+        G.forEach(g => parts.push({ title: '   ' + (g.loc || '(no place written)'), head: ICOLS, body: g.rows.map((i, n) => iRow(i, n + 1)), cols: ICW }));
+        if (kind === 'register' && parts.length) parts[parts.length - 1].sign = team(a).concat(['Principal']);
+      });
+      if (!total) { say('err', 'Nothing to put in this report.'); return; }
+      await makePdf(title + ' ' + D.session + (aSel ? ' ' + aName : ''), title, 'Session ' + D.session + ' · ' + aName + ' · ' + total + ' item(s)', parts);
+    } else if (kind === 'place') {
+      const p = val('place'), cut = p.indexOf(' · '), an = p.slice(0, cut), loc = p.slice(cut + 3), a = D.areas.find(x => x.name === an), L = D.items.filter(i => i.state !== 'Removed' && a && i.area === a.id && (i.loc || '—') === loc);
+      await makePdf('Place list ' + p, loc + ' — stock list', a.name + ' · session ' + D.session + ' · ' + L.length + ' item(s)', [{ head: ICOLS, body: L.map((i, n) => iRow(i, n + 1)), cols: ICW, sign: team(a) }]);
+    } else if (kind === 'summary') {
+      const act = D.items.filter(i => i.state !== 'Removed');
+      const byA = sortAreas(D.areas).map(a => { const L = act.filter(i => i.area === a.id); return [a.sno, a.name, a.status, new Set(L.map(i => i.loc)).size, L.length, fmt(L.reduce((s, i) => s + (num(i.total) || 0), 0)), L.filter(i => itemKind(i) === 'bad').length, fmt(L.reduce((s, i) => s + (num(i.faulty) || 0), 0)), D.items.filter(i => i.area === a.id && i.state === 'Removed').length]; });
+      const cats = [...new Set(act.map(i => i.cat || 'Other'))].sort();
+      const byC = cats.map(c => { const L = act.filter(i => (i.cat || 'Other') === c); return [c, L.length, fmt(L.reduce((s, i) => s + (num(i.total) || 0), 0)), L.filter(i => itemKind(i) === 'bad').length, fmt(L.reduce((s, i) => s + (num(i.faulty) || 0), 0))]; });
+      await makePdf('Physical verification summary ' + D.session, 'Physical verification summary', 'Session ' + D.session + ' · pieces count only plain numbers (not "dozen", "packets" written with the number)', [
+        { title: 'By area', head: ['S.No', 'Area', 'Status', 'Places', 'Item rows', 'Pieces', 'Rows broken / missing', 'Pieces broken / missing', 'Removed'], body: byA.concat([['', 'TOTAL', '', '', act.length, fmt(act.reduce((s, i) => s + (num(i.total) || 0), 0)), act.filter(i => itemKind(i) === 'bad').length, fmt(act.reduce((s, i) => s + (num(i.faulty) || 0), 0)), D.items.length - act.length]]) },
+        { title: 'By category', head: ['Category', 'Item rows', 'Pieces', 'Rows broken / missing', 'Pieces broken / missing'], body: byC }]);
+    } else if (kind === 'pending') {
+      const P = sortAreas(D.areas).filter(a => a.status !== 'Received');
+      await makePdf('Physical verification pending ' + D.session, 'Physical verification — pending', 'Session ' + D.session + ' · ' + P.length + ' area(s) pending on ' + new Date().toLocaleDateString('en-GB'),
+        [{ head: ['S.No', 'Area / Lab', 'Team', 'Status'], body: P.map(a => [a.sno, a.name, a.team, a.status]), empty: 'Every area has submitted its verification.', cols: { 1: { fontStyle: 'bold' } } }]);
+    } else if (kind === 'log') {
+      if (!LOG) await loadLog(true);
+      const R = logRows();
+      await makePdf('Physical verification changes ' + D.session, 'Physical verification — changes', 'Session ' + D.session + ' · ' + R.length + ' change(s)', [{ head: ['When', 'By', 'Area', 'Action', 'Item', 'Details'], body: R.map(r => [r[0], r[1], r[3], r[4], r[5], r[6]]),
+        cols: { 0: { cellWidth: 24 }, 1: { cellWidth: 26 }, 2: { cellWidth: 26 }, 3: { cellWidth: 22 }, 4: { cellWidth: 40 } } }], true);
+    }
+    hush();
+  }catch(e){ say('err', e.message); }
+}
+
+/* ---------------- LOG ---------------- */
+async function loadLog(quiet){
+  if (!quiet) say('busy', 'Reading the changes…');
+  try{ const r = await api({ action: 'pv_log', session: D ? D.session : '', n: 2000 }); LOG = r.rows; if (!quiet) hush(); drawLog(); }
+  catch(e){ say('err', e.message); }
+}
+function logRows(){ const q = $('logQ').value.trim().toLowerCase(); return (LOG || []).filter(r => !q || r.join(' ').toLowerCase().includes(q)); }
+function drawLog(){
+  if (!LOG) return;
+  const R = logRows();
+  $('o_log').innerHTML = R.length ? '<div class="sec"><h3><span>Changes in ' + esc(D.session) + '</span><span class="pill">' + R.length + '</span></h3><div class="scroll"><table><thead><tr><th>When</th><th>By</th><th>Area</th><th>Action</th><th>Item</th><th>Details</th></tr></thead><tbody>' +
+    R.slice(0, 600).map(r => '<tr><td>' + esc(r[0]) + '</td><td class="l">' + esc(r[1]) + '</td><td class="l">' + esc(r[3]) + '</td><td><b>' + esc(r[4]) + '</b></td><td class="l">' + esc(r[5]) + '</td><td class="l pill">' + esc(r[6]) + '</td></tr>').join('') +
+    '</tbody></table></div></div>' : '<div class="empty"><b>No changes yet</b>Changes made on this page are listed here.</div>';
+}
+
+/* ---------------- START ---------------- */
+(function(){
+  if (!user || !pass) { document.querySelector('.wrap').innerHTML = '<div class="empty"><b>Sign in first</b>Open the attendance app and sign in, then come back.</div>'; return; }
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && $('dlg').open && e.target.tagName === 'INPUT') { const b = $('dlgIn').querySelector('.dacts .btn.p'); if (b) { e.preventDefault(); b.click(); } } });
+  load('');
+})();
+</script>
+</body>
+</html>
