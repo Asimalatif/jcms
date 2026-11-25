@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.1
+// @version      1.2
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
-// @require      https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js
+// @require      https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @run-at       document-idle
@@ -31,7 +31,8 @@
     snoStart: 1,                 // S.No of the first student (last S.No of Transform + 1)
     lastDate: '',                // last date of admission dd/mm/yyyy: fee paid after it = late (empty = everyone on time)
     evening: false,              // Evening Pre-Medical admitting this year? (late Pre-Medical students go to (E))
-    openSub: 85                  // Pre-Medical subsidized Open Quota seats
+    openSub: 85,                 // Pre-Medical subsidized Open Quota seats
+    subFee: 60000                // Pre-Medical subsidized fee (all fee challans together); self-finance = 120000 (often 60000 paid + 60000 unpaid)
   };
   const TRANSFORM_HEAD = ['S.No', 'Enroll#', 'Student Name', 'Father Name', 'Program/Class/Section', 'Program', 'Class', 'Section', 'PCS',
     'Sub1', 'Sub2', 'Sub3', 'Sub4', 'Sub5', 'Sub6', 'Sub7', 'Appeared in', 'Quota', 'DOB', 'GroupOnly', 'Obtained Marks', 'Total Marks', 'MeritNo', 'HQ',
@@ -97,7 +98,11 @@
       const obt = numOf(s['Obtain Marks/CGPA']), tot = numOf(s['Total Marks/CGPA']), hq = /^y/i.test(s['HQ'] || '') ? 'Yes' : 'No';
       const agg = obt !== null && tot ? Math.round((obt + (hq === 'Yes' ? 20 : 0)) * 100 / tot * 100) / 100 : null;
       const fee = dkey(s['Fee Paid Date']), dob = dkey(s['DOB']);
-      const o = { s, pk: programKey(s['Program']), quota: quotaOf(s['Category']), hq, obt, tot, agg, dob, fee, late: !!(last && fee && fee > last) };
+      // fee challans above Rs 3,000 (paid P- and unpaid U-): their total says subsidized (60,000) or self-finance (120,000)
+      let feeTotal = 0, feePaid = 0;
+      String(s['Challan Details'] || '').split(',').forEach(c => { const m = c.trim().match(/^([PU])-([\d.]+)/i); if (!m || +m[2] <= 3000) return; feeTotal += +m[2]; if (/p/i.test(m[1])) feePaid += +m[2]; });
+      const o = { s, pk: programKey(s['Program']), quota: quotaOf(s['Category']), hq, obt, tot, agg, dob, fee, late: !!(last && fee && fee > last),
+        feeTotal, subFee: feePaid > 0 && feeTotal <= Number(cfg.subFee || 60000) };
       if (agg === null) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No matric marks on the portal: Aggregate and merit left empty, put at the end of the list.']);
       if (!dob) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No date of birth on the portal (age decides equal Aggregates).']);
       if (!fee) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No paid admission fee (above Rs 3,000) found on the portal.']);
@@ -122,13 +127,21 @@
       if (o.quota === UOP) k = 'PMS';
       else if (POOLS[o.quota]) k = o.inPool ? 'PMS' : 'PMM';
       else if (SUB_SEATS[o.quota] !== undefined) { used[o.quota] = used[o.quota] || 0; if (!o.late && used[o.quota] < SUB_SEATS[o.quota]) { used[o.quota]++; k = 'PMS'; } }
-      else if (o.quota === OPEN) { used[OPEN] = used[OPEN] || 0; if (!o.late && o.agg !== null && used[OPEN] < cfg.openSub) { used[OPEN]++; k = 'PMS'; } }
+      else if (o.quota === OPEN) {
+        used[OPEN] = used[OPEN] || 0;
+        if (!o.late && o.agg !== null && used[OPEN] < cfg.openSub) { used[OPEN]++; k = 'PMS'; }
+        else if (o.subFee) {                                   // paid the subsidized fee but below the Open Quota merit: another quota shown as Open
+          k = 'PMS'; o.flag = 'Paid the subsidized fee (Rs ' + o.feeTotal.toLocaleString('en-US') + ') but her Aggregate ' + (o.agg ?? '-') + ' is below the Open Quota subsidized merit: she must be on another quota. Kept in Pre-Medical (S). Ask her and change the Quota.';
+        }
+      }
+      if (k === 'PMS' && o.quota === OPEN && !o.flag && o.feeTotal > Number(cfg.subFee || 60000))
+        notes.push([o.s['Student Name'], o.s['Father Name'], 'Pre-Medical (S)', 'In the subsidized merit but paid the self-finance fee (Rs ' + o.feeTotal.toLocaleString('en-US') + '): refund / adjust the fee.']);
       if (k === 'PMM' && o.late && cfg.evening) k = 'PME';
       sheetOf.set(o, k);
     });
     S.filter(o => o.pk !== 'PM').forEach(o => sheetOf.set(o, o.pk));
     // 2. every sheet: rolls in merit order, sections in turn (A, B, C, A …), MeritNo and Age-wise per quota
-    const out = {}, seats = [['Sheet', 'Quota', 'Students', 'Seats', 'Highest Aggregate', 'Lowest Aggregate (stopping merit)']];
+    const out = {}, marks = {}, seats = [['Sheet', 'Quota', 'Students', 'Seats', 'Highest Aggregate', 'Lowest Aggregate (stopping merit)']];
     let sno = Number(cfg.snoStart) || 1;
     SHEETS.forEach(sh => {
       const L = S.filter(o => sheetOf.get(o) === sh.key);
@@ -146,6 +159,8 @@
         if (typeof lim === 'number' && G.length > lim && sh.key !== 'PMS') notes.push(['', '', sh.name, q + ': ' + G.length + ' students for ' + lim + ' seat(s).']);
         seats.push([sh.name, q, byQ[q].length, lim == null ? '-' : lim, G.length ? G[0].agg : '', G.length ? G[G.length - 1].agg : '']);   // G is by Aggregate: first = highest
       });
+      marks[sh.name] = [];
+      L.forEach((o, i) => { if (o.flag) { marks[sh.name].push(i); notes.push([o.s['Student Name'], o.s['Father Name'], sh.name + ' · row ' + (i + 2), o.flag]); } });
       out[sh.name] = L.map((o, i) => {
         const s = o.s, sec = sh.sections[i % sh.sections.length], roll = 'JCW-F' + cfg.year + '-' + (sh.roll[0] + i);
         let subs = []; for (let k = 1; k <= 7; k++) subs.push(sp(s['sub' + k + ' 1st year']).toUpperCase());
@@ -160,7 +175,7 @@
             sp(s['Challan Details']), sp(s['Student Id']), o.agewise || '', sp(s['Fee Paid Date']), '', o.late ? 'Late admission (fee after ' + cfg.lastDate + ')' : '']);
       });
     });
-    return { sheets: out, notes, seats };
+    return { sheets: out, notes, seats, marks };   // marks: rows (0 = first student) whose Quota cell is highlighted
   }
 /*ENGINE-END*/
 
@@ -367,6 +382,7 @@
     <label>First S.No <input id="jnSno" type="number"></label>
     <label>Last date of admission <input id="jnLast" placeholder="dd/mm/yyyy (optional)"></label>
     <label>Pre-Medical (S) Open seats <input id="jnOpen" type="number"></label>
+    <label>Pre-Medical subsidized fee (Rs) <input id="jnFee" type="number"></label>
     <label>Evening Pre-Medical this year <input id="jnEve" type="checkbox"></label>
     <label>Batch of the new 1st Year <select id="jnBatch"><option value="">(read the list first)</option></select></label>
     <button id="jnList">1. Read the list</button>
@@ -377,9 +393,9 @@
   const $ = id => box.querySelector('#' + id);
   const say = (m, pct) => { $('jnMsg').textContent = m; if (pct != null) $('jnBar').style.width = Math.max(0, Math.min(100, pct)) + '%'; };
   const cfg = Object.assign({}, DEFAULTS, GM_getValue('jcwNewCfg', {}));
-  $('jnSes').value = cfg.session; $('jnYear').value = cfg.year; $('jnSno').value = cfg.snoStart; $('jnLast').value = cfg.lastDate; $('jnOpen').value = cfg.openSub; $('jnEve').checked = !!cfg.evening;
+  $('jnSes').value = cfg.session; $('jnYear').value = cfg.year; $('jnSno').value = cfg.snoStart; $('jnLast').value = cfg.lastDate; $('jnOpen').value = cfg.openSub; $('jnFee').value = cfg.subFee; $('jnEve').checked = !!cfg.evening;
   const readCfg = () => { const c = { session: sp($('jnSes').value), year: sp($('jnYear').value).replace(/\D/g, '').slice(-2), snoStart: Number($('jnSno').value) || 1, lastDate: sp($('jnLast').value),
-    openSub: Number($('jnOpen').value) || 0, evening: $('jnEve').checked }; GM_setValue('jcwNewCfg', c); return c; };
+    openSub: Number($('jnOpen').value) || 0, subFee: Number($('jnFee').value) || 60000, evening: $('jnEve').checked }; GM_setValue('jcwNewCfg', c); return c; };
   $('jnMin').onclick = () => box.classList.toggle('min');
   let LIST = null, busy = false;
   const lock = on => { busy = on; ['jnList', 'jnGo', 'jnResume'].forEach(i => { $(i).disabled = on || (i === 'jnGo' && !LIST); }); };
@@ -418,6 +434,8 @@
       Object.keys(res.sheets).forEach(name => {
         const ws = XLSX.utils.aoa_to_sheet([TRANSFORM_HEAD].concat(res.sheets[name]));
         ws['!cols'] = TRANSFORM_HEAD.map((h, k) => ({ wch: [2, 3, 14, 26].includes(k) ? 24 : k === 4 ? 34 : 12 }));
+        const qc = TRANSFORM_HEAD.indexOf('Quota');
+        (res.marks[name] || []).forEach(i => { const a = XLSX.utils.encode_cell({ r: i + 1, c: qc }); if (ws[a]) ws[a].s = { fill: { patternType: 'solid', fgColor: { rgb: 'FFFF00' } }, font: { bold: true, color: { rgb: 'C00000' } } }; });
         XLSX.utils.book_append_sheet(wb, ws, name); counts.push(name + ' ' + res.sheets[name].length);
       });
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res.seats), 'Seats & merit');
