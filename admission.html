@@ -1225,7 +1225,7 @@ async function rfRun(apply){
     if(!r.ask || (rfFields.includes('portal') && !(r.fields || []).includes('portal'))){
       rf = null;
       dlgOpen(`<h2>The server needs the new Admissions.gs</h2><div class="sub">The Apps Script project is still running an older Admissions.gs, so it cannot compare every column with the portal.</div>
-        <ol style="margin:10px 0 0 18px;line-height:1.6"><li>Open the attendance Apps Script project.</li><li>Replace everything in <b>Admissions.gs</b> with the newest file from GitHub (Asimalatif/cs-attendance → Admissions.gs → Raw → copy all).</li><li><b>Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy.</b></li><li>Come back and press Preview changes again.</li></ol>
+        <ol style="margin:10px 0 0 18px;line-height:1.6"><li>Open the attendance Apps Script project.</li><li>Replace everything in <b>Admissions.gs</b> with the newest file from GitHub (Asimalatif/jcms → Admissions.gs → Raw → copy all).</li><li><b>Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy.</b></li><li>Come back and press Preview changes again.</li></ol>
         <div class="acts"><button class="btn primary" id="dOk">OK</button></div>`);
       $('#dOk').onclick = dlgClose;
       return;
