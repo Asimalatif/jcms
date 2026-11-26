@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.3
+// @version      1.4
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
@@ -129,14 +129,17 @@
       else if (SUB_SEATS[o.quota] !== undefined) { used[o.quota] = used[o.quota] || 0; if (!o.late && used[o.quota] < SUB_SEATS[o.quota]) { used[o.quota]++; k = 'PMS'; } }
       else if (o.quota === OPEN) {
         used[OPEN] = used[OPEN] || 0;
-        if (!o.late && o.agg !== null && used[OPEN] < cfg.openSub) { used[OPEN]++; k = 'PMS'; }
+        if (!o.late && o.agg !== null && used[OPEN] < cfg.openSub) { used[OPEN]++; k = 'PMS'; used.cut = o.agg; }   // used.cut = Open Quota subsidized stopping merit
       }
       // the fee she paid decides (every quota): subsidized fee -> (S); in (S) but paid the self-finance fee -> stays, flagged
       const rs = n => 'Rs ' + n.toLocaleString('en-US');
       if (k !== 'PMS' && o.subFee) {
         k = 'PMS'; o.flag = 'yellow';
-        o.why = o.quota === OPEN ? 'Paid the subsidized fee (' + rs(o.feeTotal) + ') but her Aggregate ' + (o.agg ?? '-') + ' is below the Open Quota subsidized merit: she must be on another quota. Kept in Pre-Medical (S). Ask her and change the Quota.'
-          : 'Paid the subsidized fee (' + rs(o.feeTotal) + ') but ' + o.quota + ' has no subsidized seat left for her (or she paid late): kept in Pre-Medical (S). Check her quota and seat.';
+        const paid = 'Paid the subsidized fee (' + rs(o.feeTotal) + ')';
+        o.why = o.late ? paid + ' on ' + sp(o.s['Fee Paid Date']) + ', after the last date of admission (' + cfg.lastDate + '), so the merit list gave the subsidized seats to on-time students (her Aggregate ' + (o.agg ?? '-') + '). Kept in Pre-Medical (S). Check whether her late admission was allowed on a subsidized seat, or her quota.'
+          : o.agg === null ? paid + ' but she has no matric marks on the portal, so she has no merit. Kept in Pre-Medical (S). Add her marks and check her quota.'
+          : o.quota === OPEN ? paid + ' but her Aggregate ' + o.agg + ' is below the Open Quota subsidized merit (' + used.cut + '): she must be on another quota. Kept in Pre-Medical (S). Ask her and change the Quota.'
+          : paid + ' but the ' + o.quota + ' subsidized seats are full (her Aggregate ' + o.agg + '): kept in Pre-Medical (S). Check her quota and seat.';
       } else if (k === 'PMS' && o.feeTotal > Number(cfg.subFee || 60000)) {
         o.flag = 'orange';
         o.why = 'On a subsidized seat (' + o.quota + (o.agg !== null ? ', Aggregate ' + o.agg : '') + ') but paid the self-finance fee (' + rs(o.feeTotal) + '). Check her quota, or refund / adjust the fee.';
