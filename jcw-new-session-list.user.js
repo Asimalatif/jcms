@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.4
+// @version      1.5
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
@@ -101,11 +101,13 @@
       // fee challans above Rs 3,000 (paid P- and unpaid U-): their total says subsidized (60,000) or self-finance (120,000)
       let feeTotal = 0, feePaid = 0;
       String(s['Challan Details'] || '').split(',').forEach(c => { const m = c.trim().match(/^([PU])-([\d.]+)/i); if (!m || +m[2] <= 3000) return; feeTotal += +m[2]; if (/p/i.test(m[1])) feePaid += +m[2]; });
-      const o = { s, pk: programKey(s['Program']), quota: quotaOf(s['Category']), hq, obt, tot, agg, dob, fee, late: !!(last && fee && fee > last),
-        feeTotal, subFee: feePaid > 0 && feeTotal <= Number(cfg.subFee || 60000) };
+      const quota = quotaOf(s['Category']), emp = quota === UOP;   // UoP employees: always subsidized, they pay no fee (the portal's challans for them mean nothing)
+      const o = { s, pk: programKey(s['Program']), quota, emp, hq, obt, tot, agg, dob, fee, late: !emp && !!(last && fee && fee > last),
+        feeTotal, subFee: !emp && feePaid > 0 && feeTotal <= Number(cfg.subFee || 60000) };
       if (agg === null) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No matric marks on the portal: Aggregate and merit left empty, put at the end of the list.']);
       if (!dob) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No date of birth on the portal (age decides equal Aggregates).']);
-      if (!fee) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No paid admission fee (above Rs 3,000) found on the portal.']);
+      if (!fee && !emp) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No paid admission fee (above Rs 3,000) found on the portal.']);
+      if (emp && agg !== null && agg < 50) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'UoP Employee Quota needs at least 50% marks: her Aggregate is ' + agg + '.']);
       return o;
     }).filter(o => { if (!o.pk) { notes.push([o.s['Student Name'], o.s['Father Name'], o.s['Program'], 'Program not known: left out.']); return false; } return true; });
     /* merit order: on time first, higher Aggregate, then older (earlier DOB), then earlier fee date */
@@ -140,7 +142,7 @@
           : o.agg === null ? paid + ' but she has no matric marks on the portal, so she has no merit. Kept in Pre-Medical (S). Add her marks and check her quota.'
           : o.quota === OPEN ? paid + ' but her Aggregate ' + o.agg + ' is below the Open Quota subsidized merit (' + used.cut + '): she must be on another quota. Kept in Pre-Medical (S). Ask her and change the Quota.'
           : paid + ' but the ' + o.quota + ' subsidized seats are full (her Aggregate ' + o.agg + '): kept in Pre-Medical (S). Check her quota and seat.';
-      } else if (k === 'PMS' && o.feeTotal > Number(cfg.subFee || 60000)) {
+      } else if (k === 'PMS' && !o.emp && o.feeTotal > Number(cfg.subFee || 60000)) {
         o.flag = 'orange';
         o.why = 'On a subsidized seat (' + o.quota + (o.agg !== null ? ', Aggregate ' + o.agg : '') + ') but paid the self-finance fee (' + rs(o.feeTotal) + '). Check her quota, or refund / adjust the fee.';
       }
