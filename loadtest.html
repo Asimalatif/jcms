@@ -41,6 +41,11 @@ Working days <input id="nd" type="number" min="1" max="14" value="7" style="widt
 <div class="row"><button class="p" id="bRun">Start the test</button><button id="bStop" disabled>Stop</button><button id="bCsv" disabled>Download all requests (Excel CSV)</button></div>
 <div class="bar"><i id="bar"></i></div><div id="prog" class="sub"></div></section>
 
+<section class="card"><h2>Instant save (inbox)</h2>
+<div class="sub">Saves of attendance marks go into a small inbox and are answered at once; every minute the server writes the inbox into the month workbook. The load test always uses the inbox (on the copy). <b>Teachers</b> use it only when you switch it on here.</div>
+<div class="row"><button id="bInT">How many wait for the copy?</button><span id="inT" class="sub"></span></div>
+<div class="row"><b>For teachers (real sheets):</b> <span id="inR" class="sub">…</span><button id="bInOn">Switch ON</button><button id="bInOff">Switch OFF</button></div>
+</section>
 <section class="card"><h2>3 · Results</h2>
 <div class="k" id="kpi"></div>
 <h2 style="margin-top:14px">Where the server spends the time (average per save)</h2><div id="tmx" class="sub">Run the test first.</div>
@@ -65,6 +70,12 @@ async function api(p, ms){
   finally{ clearTimeout(tm); }
 }
 if(!user) $('#setMsg').innerHTML = '<span class="bad">Sign in to the attendance app with the admin login first (same browser), then reload this page.</span>';
+const inShow = (el, r) => { $(el).innerHTML = r.ok ? (r.on !== undefined && el === '#inR' ? (r.on ? '<span class="ok">ON</span>' : '<span class="warn">OFF (saves go straight to the sheets as before)</span>') + ' · ' : '') + r.waiting + ' save(s) waiting' + (r.olderThan3min ? ' · <span class="bad">' + r.olderThan3min + ' older than 3 min</span>' : '') : '<span class="bad">' + esc(r.error) + '</span>'; };
+$('#bInT').onclick = async () => { $('#inT').textContent = '…'; inShow('#inT', await api({ action:'inbox_admin', test:true })); };
+const inReal = async set => { const r = await api(Object.assign({ action:'inbox_admin' }, set ? { set } : {})); inShow('#inR', r); };
+$('#bInOn').onclick = () => { if(confirm('Switch ON instant save for every teacher? Their attendance saves are answered at once and reach the sheets within about a minute.')) inReal('on'); };
+$('#bInOff').onclick = () => inReal('off');
+if(user) inReal();
 $('#bSet').onclick = async () => { const r = await api({ action:'test_setup', mon:$('#mon').value, id:$('#cid').value.trim() }, 60000);
   $('#setMsg').innerHTML = r.ok ? (r.off ? 'Test switched off.' : '<span class="ok">✓ Using the copy "' + esc(r.name) + '" for ' + esc(r.mon) + '.</span> Real workbooks stay untouched.') : '<span class="bad">' + esc(r.error) + '</span>'; };
 $('#bOff').onclick = async () => { const r = await api({ action:'test_setup', mon:$('#mon').value, id:'' }, 60000); $('#setMsg').textContent = r.ok ? 'Test switched off: the server no longer knows the copy.' : r.error; };
