@@ -2047,7 +2047,7 @@ function meritLists(){
       const pl = q.pooled ? s.pools.find(x => qk(x.quota) === qk(q.name)) : null;
       const home = pl ? pl.members.map(m => m.key).filter(k => used.has(k)) : [p.key];
       // v8.47 a shared pool is built once, under its subsidized program (Pre-Medical (S)) when it has one, so its refund list / shifting letter work
-      const anc = pl ? (home.find(k => (prog(k) || {}).fee === 'sub') || home[0]) : p.key;
+      const anc = pl ? (home.find(k => ladderOf((prog(k) || {}).classProgram).length > 1 && (prog(k) || {}).fee === 'sub') || home[0]) : p.key;   // v8.48 the program with a subsidized / non-subsidized split (Pre-Medical), not F.A
       if(pl && anc !== p.key) return;
       const qq = qk(q.name), emp = /\bu\.?\s*o\.?\s*p\b.*employ|universit\w*\s*employ/i.test(q.name);   // UoP Employee Quota: every employee's daughter is admitted, always on a subsidized seat
       const keys = home.concat(sib);
