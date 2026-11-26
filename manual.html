@@ -71,7 +71,7 @@ section.reading{outline:3px solid #E7B7AE;outline-offset:4px}
 <body>
 <header class="top">
   <img src="jcw-logo.png" alt="">
-  <h1>JCMS Manual<small>Jinnah College Management System · Jinnah College for Women · attendance, tests, reports, student search, admissions</small></h1>
+  <h1>JCMS Manual<small>Jinnah College Management System · Jinnah College for Women · attendance, tests, reports, student search, admissions and every admin module</small></h1>
   <span class="sp"></span>
   <span class="ttsBar"><button type="button" id="ttsAll">🔊 Listen to all</button><select id="ttsRate" aria-label="Reading speed"><option value="0.8">Slow</option><option value="1" selected>Normal</option><option value="1.2">Fast</option></select></span>
   <a href="./">Open the app</a>
@@ -106,11 +106,25 @@ section.reading{outline:3px solid #E7B7AE;outline-offset:4px}
     <li><a href="#check">18. Check everything</a></li>
     <li><a href="#free">19. Free teachers</a></li>
     <li><a href="#adm">20. Admissions</a></li>
+    <li><a href="#admrules">20A. Admission rules (rulebook)</a></li>
+    <li><a href="#admtabs">20B. Admissions: every tab</a></li>
+    <li><a href="#newlist">20C. New session list (Tampermonkey)</a></li>
     <li><a href="#gtadmin">21. Grand test / detention settings</a></li>
     <li><a href="#board">Board results (gazette PDF)</a></li>
     <li><a href="#collreports">📊 College reports</a></li>
     <li><a href="#leftsync">🔄 Portal sync &amp; students who left</a></li>
-    <li><a href="#faq">22. Problems and answers</a></li>
+    <li><a href="#logins">23. Logins &amp; services</a></li>
+    <li><a href="#admintools">24. Admin tools</a></li>
+    <li><a href="#duties">25. Exam duty lists</a></li>
+    <li><a href="#idcards">26. Student ID cards</a></li>
+    <li><a href="#certs">27. Provisional certificates</a></li>
+    <li><a href="#physical">28. Physical verification</a></li>
+    <li><a href="#system">29. Backups &amp; new session</a></li>
+    <li><a href="#shortage">30. Attendance shortage</a></li>
+    <li><a href="#rsm">31. Marked-missed entries</a></li>
+    <li><a href="#leavesadm">32. Approved leaves</a></li>
+    <li><a href="#ttedit">33. Timetable editor</a></li>
+    <li><a href="#faq">34. Problems and answers</a></li>
   </ol>
 </nav>
 <main id="manual">
@@ -426,6 +440,165 @@ section.reading{outline:3px solid #E7B7AE;outline-offset:4px}
 <div><p><b>Seats</b>: seats, filled and left for every program and quota. <b>Tap a Taken number</b> to see the students who took those seats (PDF / Excel / print / share). A pooled quota shows <i>Pooled with</i> (programs that may use it) and <i>Taken by</i>. <b>Quota-wise (all programs)</b> lists every quota (UET, Sports, Afghan…) with the programs its seats went to and the students. A red card at the top lists <b>Pre-Medical students with a Rs 60,000 challan in a non-subsidized program</b> (Self Morning / Evening): Rs 60,000 is the subsidized fee, so they probably belong in Pre-Medical Open (S); move them with Find &amp; edit. In <b>New</b>, a full quota is a warning: <b>Seats full: admit anyway</b> saves her. Afterwards run <b>Check everything</b> so the new students appear in the attendance and test sheets.</p></div></div>
 </section>
 
+<section id="admrules"><h2><span class="n">20A</span>Admission rules: the complete rulebook <span class="who">Admin</span></h2>
+<p class="lead">Every rule the app (Admissions page) and the New Session List script follow when they decide who gets which seat, which fee is right and who must be shifted. The same rules are used everywhere: merit lists, seat counts, From portal recommendations, refund list, shifting letter and the Excel list of the New Session List script.</p>
+
+<h3>1. Programs and the Pre-Medical ladder</h3>
+<table><tr><th>Program (sheet)</th><th>Short name</th><th>Fee</th></tr>
+<tr><td>Pre Medical Open</td><td>Pre-Medical (S), subsidized</td><td>Half fee (Rs 60,000)</td></tr>
+<tr><td>Self Morning Medical</td><td>Pre-Medical (M), non-subsidized</td><td>Full fee (Rs 120,000)</td></tr>
+<tr><td>Evening Pre Medical</td><td>Pre-Medical (E), evening</td><td>Evening fee</td></tr>
+<tr><td>Pre Engg</td><td>Pre-Engineering</td><td>One fee</td></tr>
+<tr><td>FCS</td><td>FCS (Computer Science)</td><td>One fee</td></tr>
+<tr><td>FA</td><td>F.A</td><td>One fee</td></tr></table>
+<ul>
+<li><b>Only Pre-Medical has subsidized and non-subsidized seats.</b> So only Pre-Medical students can be shifted (S ↔ M) or get a half-fee refund. F.A, FCS and Pre-Engineering have one fee for everyone.</li>
+<li>The <b>ladder</b> is Pre-Medical (S) → Self Morning (M) → Evening (E). Every Pre-Medical (S) quota takes its students from <b>all</b> Pre-Medical programs: the best students of that quota get the subsidized seats, wherever they were admitted.</li>
+<li>The fees shown on each merit list card are the <b>most common paid challan</b> of that program (e.g. Rs 60,000 and Rs 120,000).</li>
+</ul>
+
+<h3>2. Aggregate</h3>
+<div class="note"><b>Aggregate = (Obtained marks + 20 if Hafiz-e-Quran) × 100 ÷ Total marks</b>, 2 decimals. HQ (Hafiz-e-Quran) comes from the portal. Example: 1080/1200 with HQ = (1080 + 20) × 100 ÷ 1200 = 91.67.</div>
+<ul><li>A student with no matric marks on the portal has no Aggregate, so she has no merit place until her marks are filled.</li>
+<li>O-Level students have their own totals (e.g. 905/1100); the Aggregate makes them comparable.</li></ul>
+
+<h3>3. MeritNo and Age-wise</h3>
+<ul>
+<li><b>MeritNo</b> is counted separately inside every program and every quota (1st Year only). Highest Aggregate = 1.</li>
+<li>Equal Aggregate = the <b>same</b> MeritNo, and no number is skipped (1, 2, 2, 2, 3 …).</li>
+<li><b>Age-wise</b> ranks only the students who share an Aggregate: the <b>older one first</b> (from DOB) gets “1st”, then “2nd” … Students with a unique Aggregate have it empty.</li>
+<li>So the order of a merit list is: Aggregate (high to low) → older first.</li>
+</ul>
+
+<h3>4. Fee rules: the fee decides</h3>
+<table><tr><th>Rule</th><th>What it means</th></tr>
+<tr><td>Which challans count</td><td>Only challans <b>above Rs 3,000</b>. The Rs 2,600 registration challan is ignored. Paid (P) and unpaid (U) challans are added up to see which fee she was given.</td></tr>
+<tr><td>Subsidized fee</td><td>Total of Rs 60,000 or less (some of it paid) = the subsidized fee.</td></tr>
+<tr><td>Non-subsidized fee</td><td>Total of Rs 120,000 = non-subsidized, also when it is 60,000 paid + 60,000 unpaid.</td></tr>
+<tr><td>FEE PAID DATE</td><td>The date of her <b>first paid real fee</b> (first paid challan above Rs 3,000). Later installments do not change it.</td></tr>
+<tr><td>Fee not paid</td><td>Only the registration fee or nothing: the From portal tab shows a red <b>Fee not paid</b>. Ask for the paid fee slip before giving Enroll# and section.</td></tr>
+<tr><td>Subsidized fee but no merit seat</td><td>She paid Rs 60,000 but her Aggregate is below the last seat of her quota. Often the portal shows <i>Open Quota</i> by mistake and she really belongs to another quota. The New Session List keeps her in Pre-Medical (S) with a <b>yellow</b> Quota cell; the Seats tab shows the red “Rs 60,000 challan in a non-subsidized program” card.</td></tr>
+<tr><td>On a subsidized seat but paid Rs 120,000</td><td>She must get Rs 60,000 back and be shifted to subsidized: she appears in the <b>Half-fee refund list</b> and the <b>Shifting letter</b>. In the New Session List her Quota cell is <b>orange</b>. This is checked for <b>every</b> quota (Open, O-Level, Sports, Afghan …).</td></tr>
+<tr><td>UoP Employee Quota</td><td>Always subsidized, whatever the portal fee says (employees do not really pay; the portal makes a challan by itself). No seat limit. If her Aggregate is <b>below 50%</b> she stays subsidized but is marked <b>red</b> and listed in “Check these”.</td></tr></table>
+
+<h3>5. Last date of admission and late students</h3>
+<ul>
+<li>Set in Merit lists → <b>Last date of admission</b> → Save date (for every device). Empty date = no late rule.</li>
+<li>A student whose FEE PAID DATE is after the last date, or who has not paid, is <b>late</b>. Her row says “Late: fee paid …, after the last date” or “Fee not paid by the last date”.</li>
+<li>Seats are given first to <b>on-time</b> students in merit order. Late students come <b>after every on-time student</b> of the quota, by Aggregate, then the earlier fee date, then the older first.</li>
+<li>So the late rule matters <b>only when there are more students than seats</b>. If a seat is still empty after all on-time students, a late student gets it.</li>
+<li><b>Bank forwarded the fee late</b>: if she paid in time but the portal shows a later date, press <b>✎</b> next to Fee paid in her merit list row and enter the date on her paid receipt and why (e.g. “Receipt seen, bank forwarded late”). It is kept in the strength sheet (FEE RECEIPT DATE, FEE DATE NOTE); portal syncs never change it, and every merit list uses it instead of the portal date. <b>Remove</b> goes back to the portal date.</li>
+</ul>
+
+<h3>6. Seats</h3>
+<ul>
+<li>Seats of every program and quota are set in <b>Admissions → Seat settings</b> (saved in the Quota Settings sheet). Every change is written in Seat Changes with who and when.</li>
+<li><b>Own seats</b>: e.g. Pre-Medical (S) Open Quota 85, O-Level Quota 6, F.A Afghan Quota 5.</li>
+<li><b>Shared seats (pools)</b>: one number of seats that several programs fill together, with one merit list for all of them. E.g. Afghan Quota shared by Pre Medical Open, Pre Engg, FCS; Sports Quota shared by FA, FCS, Pre Engg, Pre Medical Open. The pool's merit list and its refund list are built under Pre-Medical (S) when Pre-Medical is in the pool.</li>
+<li>A quota with no seats set has no seat limit (e.g. UoP Employee Quota: every employee's daughter is admitted on a subsidized seat).</li>
+<li><b>Evening Pre-Medical admitting this year</b> (Merit lists tab): on = Self Morning seats are a limit and the rest go to Evening; off = Self Morning takes everybody.</li>
+<li><b>Surplus</b> (more students than seats) is allowed only in Open Quota of non-subsidized Pre-Medical, FCS, F.A and Pre-Engineering. Anywhere else it is shown as a problem.</li>
+<li>Students who <b>left, cancelled or migrated out</b> are not counted: their seat becomes empty for the next student.</li>
+</ul>
+
+<h3>7. Who gets a seat (the order)</h3>
+<ol class="steps">
+<li>All students of the quota (for Pre-Medical (S): from every Pre-Medical program) are put in order: on-time first, then Aggregate high to low, then older first; late students after them.</li>
+<li>The first <i>seats</i> students get the seats. A <b>thick line</b> marks the last seat.</li>
+<li>Below the line: <b>Next in line</b> (when a subsidized seat empties she moves up), and <b>Possible candidate</b> (yellow) for an empty seat of this list.</li>
+<li>A student <b>above</b> the line who is not in the subsidized program = <b>wrong place</b>: she should move up to subsidized (shifting letter + half-fee refund). A student in the subsidized program <b>below</b> the line should move down to Self Morning (M).</li>
+<li>Ties at the last seat are decided by age (older first). Example: if 85 seats are full, the 86th student goes to Self Morning even if her Aggregate equals the 85th.</li>
+</ol>
+
+<h3>8. Enroll# (Roll No) ranges, sections and rooms</h3>
+<table><tr><th>Program</th><th>Enroll# range (JCW-F&lt;yy&gt;-N)</th></tr>
+<tr><td>Pre-Medical (S)</td><td>1 – 203</td></tr><tr><td>Pre-Medical (M)</td><td>204 – 1099</td></tr><tr><td>Pre-Medical (E)</td><td>1100 – 1999</td></tr>
+<tr><td>Pre-Engineering</td><td>2001 – 2099</td></tr><tr><td>F.A</td><td>2101 – 2299</td></tr><tr><td>FCS</td><td>2301 – 2399</td></tr></table>
+<ul>
+<li>A new student gets the <b>next free number</b> of her program's range, in the order the portal admitted her. An Enrollment# already on the portal is kept.</li>
+<li>When a student is shifted to another program she gets a new number of the new program's range (“New number for this program”).</li>
+<li><b>Section suggestion</b>: a section of her program whose room still has free seats. The room size comes from its name: <i>R # 05/40</i> = 40 seats; <i>R # 05/40 (EVENING)</i> is the same room. “Optional Subjects” is never suggested. A section over its room capacity shows ⚠.</li>
+<li>The <b>Room</b> column is the section's theory room from the Timetable.</li>
+</ul>
+
+<h3>9. Migrated students</h3>
+<ul>
+<li><b>1st Year migrated in</b>: students on the board's (BISEP) migration list; paste the list in Merit lists → <b>Paste the BISEP migration list</b> (the UOP portal does not tell). Matched by name and father name.</li>
+<li><b>2nd Year migrated in</b>: on the BISEP list, <b>or</b> no 1st-year payment on the UOP portal (first fee on or after 1 August of this session), <b>or</b> Enroll# in the migration range, <b>or</b> listed in the sheet “Migrated to JCW”. The list's last column says why.</li>
+<li>Migrated-in students are not placed in the 1st Year merit lists.</li>
+</ul>
+
+<h3>10. Half-fee refund list and shifting letter</h3>
+<ul>
+<li><b>Who</b>: Pre-Medical students on a subsidized seat who paid the non-subsidized fee. Refund = what she paid − subsidized fee (e.g. 120,000 − 60,000 = 60,000).</li>
+<li>Tick <b>Also the other subsidized quotas</b> to include Minority, O-Level, Sports, Afghan … in the same list or letter.</li>
+<li><b>Order</b>: each quota together — Open Quota first, then the other quotas A–Z (O-Level, Sports …); highest Aggregate first inside each quota.</li>
+<li><b>HQ cases</b>: when her matric marks alone are below the last seat but HQ +20 puts her on a seat, the refund list adds <b>Obtained, HQ, Aggregate</b> columns, and the letter writes e.g. <i>1080/1200 + 20 HQ, Aggregate 91.67%</i>.</li>
+<li>In the letter the quota is written after the marks when it is not Open Quota, e.g. <i>1045/1200 (Sports Quota)</i>.</li>
+<li><b>Continuation letter</b>: for students found after a letter was already sent. Only students not in an earlier letter are listed, and the letter begins “In continuation of this office letter No. … dated …”. See 20B.</li>
+</ul>
+
+<h3>11. Colours used in lists</h3>
+<table><tr><th>Colour</th><th>Where</th><th>Meaning</th></tr>
+<tr><td>Thick line</td><td>Merit lists</td><td>Last seat of the quota</td></tr>
+<tr><td>Red row / wrong</td><td>Merit lists</td><td>In the wrong place for a subsidized seat (move up or down)</td></tr>
+<tr><td>Yellow row</td><td>Merit lists</td><td>Possible candidate for an empty seat</td></tr>
+<tr><td>Surplus</td><td>Merit lists</td><td>More students than seats (fine only where surplus is allowed, rule 6)</td></tr>
+<tr><td>Yellow Quota cell</td><td>New Session List Excel</td><td>Paid subsidized fee but no merit seat: kept in Pre-Medical (S), check her real quota</td></tr>
+<tr><td>Orange Quota cell</td><td>New Session List Excel</td><td>On a subsidized seat but paid the self-finance fee: refund / shift</td></tr>
+<tr><td>Red Quota cell</td><td>New Session List Excel</td><td>UoP Employee with Aggregate below 50%</td></tr>
+<tr><td>Green / red challan</td><td>From portal</td><td>Paid / unpaid challan</td></tr></table>
+</section>
+
+<section id="admtabs"><h2><span class="n">20B</span>Admissions: every tab and button <span class="who">Admin</span></h2>
+<p class="lead">Admin home → <b>Admissions</b>. Ten tabs. A login with the Admissions service sees only the tabs (parts) given to her in Logins &amp; services.</p>
+<table><tr><th>Tab</th><th>What you do there</th></tr>
+<tr><td><b>New</b></td><td>Admit one student by hand. Search the portal by name to fill name, father, portal ID, marks, DOB, contact, photo, challan, batch and subjects from the portal copy. Choose program, year, section (room filled from the timetable) and quota (seats left shown). Choose a group to fill subjects 5–7. <b>More details</b> opens DOB, contact, board, challan, photo, batch, merit no. Save shows a check (seats, roll number, duplicates) before writing. Without internet it is kept on the phone (see Waiting).</td></tr>
+<tr><td><b>From portal</b></td><td>Students Enrolled on the portal but not yet in the strength sheet (see section 20). Suggested Roll No and section, fee check, seat check, <b>Add N to strength sheet</b>. Below: <b>Update all students from the portal</b> and <b>Strength sheet ≠ portal</b> (Accept / Keep per student and column).</td></tr>
+<tr><td><b>Find &amp; edit</b></td><td>Search by name, father, roll no, portal ID or section. Change any column and save; only what you change is written (portal-sync columns stay). <b>Complete record</b> shows every column of her row. Moving a student along the ladder (S → M or M → S) gives her a new number of the new program and asks for the section. Students wrong on the portal are marked red.</td></tr>
+<tr><td><b>Seats</b></td><td>Seats, taken and left for every program and quota (1st Year, counted from the strength sheet). Tap a <b>Taken</b> number for the students (PDF / Excel / print / share). <b>Shared seat pools</b> card: who used the pool. <b>Quota-wise (all programs)</b>: every quota with the programs its seats went to; <b>All quotas: PDF / Excel / share</b>. Red fee card: Pre-Medical students with a Rs 60,000 challan in a non-subsidized program.</td></tr>
+<tr><td><b>Merit lists</b></td><td>One card per program and quota (see below).</td></tr>
+<tr><td><b>Wrong on portal</b></td><td>Program, Class, Section, Enroll# or Matric / O-Level marks different on the portal (the strength sheet is taken as right). A wrong Program on the portal gives her the wrong subjects. <b>Correct them on the portal ↗</b> opens the Enrollment Manager: tick, Check only, then ▶ Update. Run a portal Quick sync first if the portal was changed by hand.</td></tr>
+<tr><td><b>Board check</b></td><td>Upload the BISE Peshawar Registration Report (draft with Pre: Rec, final with Registration #, or the Provisional Registration List with DOB only); several PDFs at once. Every student is matched by name + father and DOB, mobile #, Matric Roll No + year and subjects are compared. Filters: differences, duplicates (registered twice), no picture (cut her picture from the board PDF), not found, missing from the board. Nothing is ticked by itself: tick checked rows → write; old → new goes to the Admission Log. Ethics / Pakistani Culture students can be saved to the sheet “Pak-Culture Ethics”.</td></tr>
+<tr><td><b>Seat settings</b></td><td>Seats of each program (Quota Settings) and <b>Shared seats</b> (Seat Pools: one number of seats the ticked programs fill together). Add a quota to a program, type a new category, change numbers; nothing changes until you press Save. <b>Last changes</b> lists Seat Changes. The New Session List script reads these seats too.</td></tr>
+<tr><td><b>Waiting</b></td><td>Admissions and changes made without internet, waiting on this phone. They are sent as soon as the phone is online; anything that needs your decision (problem / error) shows here with what to do. “Every admission and change made on this phone has reached the strength sheet” = nothing waiting.</td></tr>
+<tr><td><b>Slips &amp; quick edit</b></td><td>The Admission slips tool (also in Admin tools): 4 slips per A4 landscape page with cut lines (Roll# = Enroll#, section, category, session, name, father, 7 subjects, signature line), sorted by program then Enroll#. <b>Edit</b> on a slip changes her row in the strength sheet.</td></tr></table>
+
+<h3>Merit lists tab: every control</h3>
+<table><tr><th>Control</th><th>What it does</th></tr>
+<tr><td>Program / quota cards</td><td>Header shows seats, students in it now, the fee and the sibling fee (e.g. Self Morning (M) Rs 120,000). Badges: seats left with nobody eligible, seats left with eligible students (tap to see them), surplus, wrong place, possible candidate.</td></tr>
+<tr><td>Last date of admission</td><td>Sets the late-fee date for every device (rule 5).</td></tr>
+<tr><td>Evening Pre-Medical admitting this year</td><td>On/off for the Evening limit (rule 6).</td></tr>
+<tr><td>PDF with photos (white background)</td><td>Merit list with each student's photo, background made white on this device.</td></tr>
+<tr><td>List without photos: PDF / Excel / share</td><td>Same list as table.</td></tr>
+<tr><td>Order in PDF / Excel</td><td><b>Merit-wise</b> (Aggregate, then age) or <b>As on screen</b> (late fee last).</td></tr>
+<tr><td>Print</td><td><b>All seats + next 5 / 10</b> or the whole program.</td></tr>
+<tr><td>Colour PDF</td><td>Off = black &amp; white for the college printer (low ink).</td></tr>
+<tr><td>Half-fee refund list</td><td>Rule 10. Ticks: other subsidized quotas, possible candidates.</td></tr>
+<tr><td>Shifting letter to the Director Admissions (Word)</td><td>Word letter on the college template: date, S.No, Student Name, Father Name, Marks. Ticks: other subsidized quotas; possible candidates; <b>Continuation letter</b> (Earlier letter No., Dated, pick the earlier Word letter(s): their students are left out; letters made on this device are remembered by themselves). File name has “(continuation)”.</td></tr>
+<tr><td>Left students in the top N</td><td>Students inside the seats who have left (their seats are free for the next ones).</td></tr>
+<tr><td>✎ next to Fee paid</td><td>Fee date from the receipt (rule 5).</td></tr>
+<tr><td>Shift (on a wrong-place row)</td><td>Shows the sections of the new program with free room seats (biggest room with a free seat is ticked) and opens the edit form with the new program, quota and section; nothing changes until you save. Her fee difference then shows in the refund list.</td></tr>
+<tr><td>All programs and quotas: one file</td><td>Every merit list in one PDF with photos (summary page first) or <b>Excel (all lists, one sheet each)</b>.</td></tr>
+<tr><td>Migrated-in list / Paste the BISEP migration list</td><td>Rule 9.</td></tr></table>
+</section>
+
+<section id="newlist"><h2><span class="n">20C</span>New session list from the UOP portal (Tampermonkey) <span class="who">Admin</span></h2>
+<p class="lead">The <b>JCW New Session List</b> script runs on portal.uop.edu.pk/Student/Students and makes the next session's 1st Year list as Excel, in the Transform-ALL-COLLEGE-STRENGTH columns, ready to paste into the new Transform sheet. It only reads the portal; nothing on the portal is changed.</p>
+<ol class="steps">
+<li>Install the script in Tampermonkey (open the .user.js file, Install). When Tampermonkey asks to connect to script.google.com, press <b>Always allow</b>.</li>
+<li>Open the portal Students page. The panel shows: session (e.g. 2027-28), year digits (27), last date of admission, Evening on/off, subsidized fee (60000), fee date corrections and the <b>Seats</b> box.</li>
+<li>First time only: press <b>From the app</b> and paste the sync key (app: College → UOP portal sync → Get sync key). The seats are then read from <b>Admissions → Seat settings</b> every time you press step 2. If the app cannot be reached, the Seats box is used.</li>
+<li><b>Fee date corrections</b>: one line per student whose bank date is wrong (receipt date replaces the bank date; shown in FEE RECEIPT DATE and FEE DATE NOTE columns).</li>
+<li>Press the read/build step. It reads every 1st Year student (resumes where it stopped if the page closes), applies all rules of 20A and downloads the Excel.</li></ol>
+<table><tr><th>Excel sheet</th><th>Contains</th></tr>
+<tr><td>F.A, Pre-Engineering, FCS</td><td>Students of that program in merit order with Enroll#, section, room, Aggregate, MeritNo, Age-wise</td></tr>
+<tr><td>Pre-Medical (S), (M), (E)</td><td>Subsidized seats; Self Morning; Evening (when Evening is on)</td></tr>
+<tr><td>Seats &amp; merit</td><td>Every quota: seats, filled, last merit, shared pools</td></tr>
+<tr><td>Check these</td><td>Every student that needs your eye: yellow / orange / red quota cells, late students who got a seat and why, over-filled quotas, programs over their Enroll# range, F.A students with no elective subjects</td></tr></table>
+<p>App programs map to sheets: Pre Medical Open → Pre-Medical (S), Self Morning Medical → (M), Evening Pre Medical → (E), FA → F.A, Pre Engg → Pre-Engineering, FCS → FCS. Seat Pools become “Shared (…)” lines.</p>
+</section>
+
 <section id="gtadmin"><h2><span class="n">21</span>Grand test / detention settings <span class="who">Admin</span></h2>
 <div class="row"><figure><img src="manual-img/38-grandtest-settings.jpg" alt="Settings"><figcaption>Grand test settings</figcaption></figure>
 <div><p><b>Settings</b> tab (admin only): <b>Opens</b> (date and time teachers can start), <b>Total marks</b> (whole college, e.g. 40) and <b>Deadline</b> (after it the button locks again). Detention has the same Opens/Deadline settings and shows the marks scheme.</p></div></div>
@@ -473,7 +646,121 @@ section.reading{outline:3px solid #E7B7AE;outline-offset:4px}
 <li><b>Subjects</b>: the year of a course comes from its code (JCW-ENG <b>II</b>-ENGLISH = 2nd Year); if the Courses page has nothing, the course list of the Students page is used. This fixes "Subjects missing on the portal" for students who do have courses.</li></ul>
 </section>
 
-<section id="faq"><h2><span class="n">22</span>Problems and answers</h2>
+<section id="logins"><h2><span class="n">23</span>Logins &amp; services <span class="who">Main admin</span></h2>
+<p class="lead">Admin home → <b>Logins &amp; services</b> (users.html). Every login of the Users sheet; only the main admin opens it.</p>
+<table><tr><th>Item</th><th>What it does</th></tr>
+<tr><td>+ Add a login</td><td>Name (as in the timetable for a teacher), Username, Password (at least 4 characters), Contact (WhatsApp), Role (what she sees: teacher, HOD, principal …).</td></tr>
+<tr><td>Chief Proctor</td><td>Gets teachers' discipline reports, bunkers, substitutions for every department, student search and marked-missed entries.</td></tr>
+<tr><td>Timetable editor</td><td>May edit the timetable.</td></tr>
+<tr><td>Services</td><td>Tap a service chip under a name to switch it on (green) or off. A service opens that admin page for the login with the admin's power <b>on that page only</b>. Tap ▾ to give only <b>parts</b> of a service (a ticked service needs at least one part). Services: Admissions, Student ID cards, Provisional certificates, Board results, Exam duty lists, College reports, Attendance shortage, Approved leaves, Marked-missed entries, Admin tools, Physical verification.</td></tr>
+<tr><td>Active services line</td><td>Under each name: the services that are on now (“Has every service” for the main admin). In Edit, ticked ones say “✓ active now”.</td></tr>
+<tr><td>Physical verification service</td><td>She sees <b>only her own duty</b>: the areas whose Logins include her username (see 28).</td></tr>
+<tr><td>Screens to hide</td><td>Hide screens for this login only. <b>Screens by role</b> (bottom): what to hide for everyone with a role (Attendance tab, Monthly test, Grand test, Detention). Works at next sign-in or within 10 minutes.</td></tr>
+<tr><td>Login switched off</td><td>She cannot sign in; nothing is deleted.</td></tr>
+<tr><td>Filters</td><td>With services, Switched off, Chief Proctors, Timetable editors; search box.</td></tr></table>
+</section>
+
+<section id="admintools"><h2><span class="n">24</span>Admin tools <span class="who">Admin</span></h2>
+<p class="lead">Admin home → <b>Admin tools</b>. Timetable, workload, merit, slips, orientation, room tags and the morning classes report.</p>
+<table><tr><th>Tool</th><th>What it does</th></tr>
+<tr><td>🗓 Timetable editor / 📗 Open the workbook</td><td>Opens the timetable editor (31) or the Google Sheet.</td></tr>
+<tr><td>Auto timetable</td><td>Builds the printable <b>AutoTimetable</b> sheet (Room | Section | Period I…V; each section = Subject / Teacher / Days rows; a missing teacher is shaded). Tick the programs of this printed timetable (science ticked; tick F.A for the Arts one), type the Stream label → <b>Generate AutoTimetable</b> / Open saved sheet.</td></tr>
+<tr><td>Teacher workload by status</td><td>Reads Science Timetable, ARTS TIMETABLE and DropdownData and writes <b>Permanent Workload</b>, <b>Morning Visiting Workload</b>, <b>Evening Visiting Workload</b> (department-wise: S.No, Teacher, Designation, Classes with days, WORKLOAD) and saves <i>WORKLOAD dd-MMM-yyyy.xlsx</i> next to the workbook. Evening science sections: L2, M2, N2, O2, P2, S1, T1. Buttons: Generate workload, Only re-export Drive Excel, Open saved sheets.</td></tr>
+<tr><td>Teachers' designations (promotion)</td><td>Load teachers → change a promoted teacher's designation (saved in DropdownData and the Users sheet) → Generate workload again. Weekly limits: Lecturer 12 · Assistant Professor 12 · Associate Professor 9 · Professor 6 · Principal 4–6 periods.</td></tr>
+<tr><td>Stopping merit</td><td>From the strength sheet, <b>open quota, 1st Year only</b>. Merit % = (obtained + 20 if HQ) ÷ original total × 100, also on the common 1200 scale. Writes the <b>Stopping Merit</b> sheet: program · category · sections · last admitted student.</td></tr>
+<tr><td>Admission slips</td><td>4 slips per A4 landscape page (see 20B, Slips &amp; quick edit). Edit on a slip changes the student's row.</td></tr>
+<tr><td>Orientation day lists</td><td><b>Orientation list</b> (Program → PCS → Room), <b>One program + chosen sections</b>, <b>Notice board</b> (names A–Z) so a new student quickly finds her Enroll#, PCS and Room.</td></tr>
+<tr><td>Room tags PDF</td><td>The schedule of every room for its door: one room per A4 landscape page — room, strength, class-section, then period · timings · teacher · subject · days. F.Sc rooms from Science Timetable, F.A rooms from ARTS TIMETABLE. Reload from the timetables; tick rooms.</td></tr>
+<tr><td>Morning classes report</td><td>Morning students (evening sections left out): class-wise count with fee and annual income (Subsidized / Non-Subsidized), University employees' daughters (included in the totals), and section-wise strength of 1st and 2nd year. Type the fees once → Reload students.</td></tr></table>
+</section>
+
+<section id="duties"><h2><span class="n">25</span>Exam duty lists <span class="who">Admin / DS ADMIN</span></h2>
+<p class="lead">Admin home → <b>Exam duty lists</b>. Made by the admin or a teacher with role DS ADMIN. Uses the duty table made in MS Word (Date/Day · Class · Subject · Room · Staff on Duty).</p>
+<ol class="steps">
+<li>Type the exam / list title → <b>Open Word file (.docx)</b>, or copy the table from Word / Google Sheets and paste it. Merged cells, repeated header rows and names written together (“dr.HamidaMs Fazeela”) are handled. Nothing is sent until <b>Save on server</b>.</li>
+<li><b>Names</b>: every name as written. When one teacher is written two ways, type her correct name in <b>Standard name</b>; two teachers written together → type both with a +, e.g. <i>Ms. Naila Gul + Ms. Hina Gul</i>. Names that match the app's teacher list join by themselves. <b>Fix ticked names</b>, then <b>Save names &amp; fixes on server</b> (remembered for the next exam).</li>
+<li><b>Plan &amp; edit</b>: exactly what was read; correct any cell. <b>⚡ Auto-create duties</b> puts staff in every room by all the rules: one duty a day, each teacher's number, morning / evening, own subject, superintendent, preferences.</li>
+<li><b>Checks</b>: clashes (same teacher in two rooms at the same time: give that duty to a free teacher, move her to another date, or take her off), no teacher of the room's subject, more / less duties than her share (Suggestions move duties fairly), staff with no room, rooms with no staff, rows without a date, left / not in Users, teachers with no duty.</li>
+<li><b>Outputs</b>: Teacher-wise (Teacher · Day/Date), Teacher · Total duties (fewest first, for a fair share), room-wise, day-wise, class / subject-wise, Room tags (1 page per room), All PDFs at once, Excel (all lists), Corrected Word file, Open Google Sheet. Duty timings are printed on every list. <b>WhatsApp all teachers</b> / Load WhatsApp numbers; ⇄ Swap duties; ↶ Undo last change.</li></ol>
+</section>
+
+<section id="idcards"><h2><span class="n">26</span>Student ID cards <span class="who">Admin</span></h2>
+<p class="lead">Admin home → <b>Student ID cards</b> (1st year, from the strength sheet, same design as the printed cards).</p>
+<table><tr><th>Part</th><th>What it does</th></tr>
+<tr><td>Session settings</td><td>Once a year before printing: Session start year, Valid up to (dd-mm-yyyy), Principal sign + stamp picture (goes under the student's photo) → Save session.</td></tr>
+<tr><td>Students check their own card</td><td>Share the link (Copy WhatsApp message). She enters her Enroll# and her father's first name (or last 4 digits of the college-record mobile), sees her card and confirms it or sends the right name / father name / a new photo. You approve or reject; approved names go into the strength sheet, approved photos become her card photo. Counts: confirmed, waiting, not checked; section-wise; download not-checked list (CSV). Optional last date.</td></tr>
+<tr><td>Photos</td><td>Read from Drive once and kept on this device. Status: ready, not read yet, no link, link gives no picture, fixed in this app. <b>White background on every card photo</b> (done on the device; Save white photos on the server). Fix a photo: rotate, drag, zoom to fill; new photo from camera/gallery; saved in Drive “JCW ID Cards/Student photos”.</td></tr>
+<tr><td>1. Choose students</td><td>Filters: all, without photo, photo not read, ticked only, not printed yet, enrolled only; <b>Find many students</b> (paste Enroll# or names); or one section at a time.</td></tr>
+<tr><td>Cards PDF</td><td>Section order, then Enroll#. Page 7.2 × 11.2 in, 5 cards per page (like the shop's Section E file). Print at <b>Actual size / 100%</b>.</td></tr>
+<tr><td>Board photos</td><td>Each photo upright, zoomed, white background, square, JPG named by Metric RollNo, all in one ZIP for the board (Largest file KB option).</td></tr>
+<tr><td>Card settings</td><td>Phone (back), back lines, Program (sheet), Class on card, Group on card. Changes on a card are only for that card on this device; correct wrong names in the strength sheet.</td></tr></table>
+</section>
+
+<section id="certs"><h2><span class="n">27</span>Provisional certificates <span class="who">Admin</span></h2>
+<p class="lead">Gazette → matched students → certificates. Upload the gazette in <b>Board results</b> first; it prepares everything. Only Jinnah College rows are used.</p>
+<ul>
+<li><b>One go</b> fills: Left Students struck through · Enroll#, Program, Class, Section, PCS, Group from the student list · DOB from Portal backup · Grade (gazette, or worked out from marks) · Session · board position 1–20 as distinction. Values you typed are never overwritten.</li>
+<li>Lists: <b>Ready</b>, <b>Ready · no Enroll#</b> (passed, not yet linked to a student in Transform: tap her and choose the right student), <b>Not eligible</b> (reason on each row).</li>
+<li><b>Print Date of Birth</b> tick (untick = no DOB line). <b>Print</b> (browser), <b>PDF to Drive</b> (“Certificates (all)”), Print this one. “Appeared in (group)” empty → type it and Save.</li>
+<li><b>Student came again for her certificate</b>:
+<table><tr><th>Reason</th><th>Certificate</th></tr>
+<tr><td>Lost the previous certificate</td><td>prints <b>DUPLICATE</b></td></tr>
+<tr><td>Marks changed after improvement (correct the marks first)</td><td>prints <b>DUPLICATE</b></td></tr>
+<tr><td>Name / father name spelling corrected</td><td>no DUPLICATE: just correct and Save</td></tr>
+<tr><td>Marks increased after re-totaling</td><td>no DUPLICATE: just correct and Save</td></tr></table>
+DUPLICATE is printed small and centred under the title “PROVISIONAL CUM CHARACTER CERTIFICATE”, with no border and no date. Ticking a reason shows it in the preview. <b>Remove DUPLICATE</b> undoes it; every issue is kept in the Issue log.</li>
+</ul>
+</section>
+
+<section id="physical"><h2><span class="n">28</span>Physical verification <span class="who">Admin / duty teams</span></h2>
+<p class="lead">College stock · teams · reports. Drive folder “Physical verification” with one folder per year (2026, 2027 …).</p>
+<table><tr><th>Tab / item</th><th>What it does</th></tr>
+<tr><td>Teams &amp; status</td><td>Every area / lab with its team, status (Pending, Received, Returned for correction …), received date and counts (items, broken / missing, removed, places). Tap any value to change it; it saves by itself. <b>+ Area / lab</b>: name, team (one name per line), documents (Drive links). <b>Logins</b>: tick the teachers whose app login sees this duty. <b>Match logins</b> suggests logins from team names.</td></tr>
+<tr><td>Drive panel</td><td>Lists documents in the year's folder; <b>Link N suggested</b> links them to their areas (marks a pending area received on the document's date). <b>Make folder 2027</b> when the year has none.</td></tr>
+<tr><td>Stock lists</td><td>Items per area and place: name, category, reg/page no, total, used/consumed, broken/missing, remaining (worked out), unit, condition, remarks. Filters: active, broken/missing/out of order, used/consumed, removed, all. <b>+ Add many (paste)</b> from Excel/Word (Item · Total · Used · Broken/Missing · Unit · Reg/Page · Remarks). Remove = written off (kept crossed out with reason and date; restore any time); Delete for good.</td></tr>
+<tr><td>Reports</td><td>Black &amp; white PDF + Excel: duty list, status, stock register, broken/missing, removed/written-off, etc., for the session chosen at the top.</td></tr>
+<tr><td>Changes</td><td>Every area, status and item change with who and when.</td></tr>
+<tr><td>New session</td><td>An <b>exact copy</b> of this session: same areas, teams, logins and every item with the same figures, condition and remarks (nothing left out). Only the status starts as Pending. The new year's Drive folder is made with copies of this year's documents. Staff then change the new year's figures themselves; the old session stays as it is.</td></tr>
+<tr><td>Teacher (duty) view</td><td>A teacher with the Physical verification service sees only her own areas: change numbers in the table, add new items, remove written-off ones, then <b>Submit to admin</b>. Open my stock list / Stock register PDF.</td></tr></table>
+</section>
+
+<section id="system"><h2><span class="n">29</span>Backups &amp; new session <span class="who">Main admin</span></h2>
+<table><tr><th>Item</th><th>What it does</th></tr>
+<tr><td>Complete backup</td><td>Copies every workbook; never changes or deletes anything. Open the backups folder; Previous backups.</td></tr>
+<tr><td>Automatic backups</td><td>Every Sunday 3 am a complete backup (8 newest kept). Every night 1 am a snapshot of the strength sheet, Quota Settings and other key sheets, kept 14 days. <b>Snapshot now</b>.</td></tr>
+<tr><td>Undo a wrong edit</td><td>Puts one sheet back as it was in a snapshot (a snapshot of now is made first). Needs your password and typing RESTORE.</td></tr>
+<tr><td>Restore a backup</td><td>Ticked workbooks get back their sheets from that backup (safety backup first). Type the date of the backup to confirm.</td></tr>
+<tr><td>Prepare a new session (August)</td><td>Each step asks first: complete backup → copy of the strength sheet kept → 2nd Year students taken out → 1st Year becomes 2nd Year (Class, PCS, Section: A1 → A2, FCS-1 D2 → FCS-2 D2; change any wrong mapping) → attendance, monthly test, monthly attendance, grand test and detention sheets emptied (headers, formulas, first pattern row stay) and the session tabs you tick. Not touched: Users, Timetable, Portal Data, Student Codes, Student Results. Next: new timetable, admissions, then Check everything.</td></tr></table>
+</section>
+
+<section id="shortage"><h2><span class="n">30</span>Attendance shortage <span class="who">Admin</span></h2>
+<ul><li>A subject is <b>short</b> when attended ÷ held is below the threshold (Admin settings: default threshold %).</li>
+<li>Approved leave days of the month (Leave In-Charge) are added to the attended lectures of every subject. Results: <b>Short before leaves</b>, <b>Cleared by leaves</b>, <b>Still short after leaves (final)</b>.</li>
+<li>Month or whole session (September to January added up). Students who left are left out. Optional subjects count in the student's own section.</li>
+<li>Filters: program, year, section, subject; <b>Save to workbook</b>.</li></ul>
+</section>
+
+<section id="rsm"><h2><span class="n">31</span>Marked-missed entries <span class="who">Admin / Chief Proctor</span></h2>
+<ul><li><b>Record Table</b>: every section × subject against attendance months, monthly tests, grand test and detention, ✔ marked / ✖ not marked. <i>Only unmarked rows</i>, <i>Full recheck</i>.</li>
+<li><b>Efficiency Charts</b>: program-, section-, subject- and teacher-wise; lowest / highest efficiency first; tap a bar for marked and not-marked sections; search teacher; Teachers not marking, Fully marked, Pending entries, Overall marked; ⬇ Download image.</li></ul>
+</section>
+
+<section id="leavesadm"><h2><span class="n">32</span>Approved leaves <span class="who">Admin / Leave In-Charge</span></h2>
+<ul><li><b>Enter leave</b>: find a student (works offline), From date (required) and To or number of Days (blank = one day), add more ranges, 📅 Calendar (e.g. every Thursday), optional application photo (saved to Drive).</li>
+<li><b>Many students</b> (e.g. improvement exams): common dates once, add students by name, a whole section, or pasted Enroll#; untick those not on leave; “Own dates” for different days; Save all. If she already has a leave that month: days combined (counted once) or overwritten.</li>
+<li>Views: marked leaves month by month, section grid, student contacts (call / WhatsApp), on leave on a date, month report, session summary (Principal), student certificate, What you entered (with Undo).</li>
+<li>Saved on the phone first, sent to the sheets when online; leaves feed Attendance shortage.</li></ul>
+</section>
+
+<section id="ttedit"><h2><span class="n">33</span>Timetable editor <span class="who">Admin / timetable editors</span></h2>
+<ul><li>Edit subject, teacher, room, days and section of every period block; add / delete teachers, rooms and section names (DropdownData); add a section (copy subjects &amp; periods from another) or remove one.</li>
+<li><b>Clash checks</b> (teacher busy, room taken, section overlap) only within the same shift; evening sections are never compared with morning.</li>
+<li><b>🕐 Free slots / rooms</b>: section + teacher free periods, free rooms for a day and period, a room's whole week; 🔀 Move to a free slot.</li>
+<li><b>⚙ Settings</b>: Evening sections, Credit hours (min–max days per subject, morning and evening; F.A not checked), period timings per shift, rooms list (“R # 06/55” and “R # 06/55 (EVENING)” are one room).</li>
+<li>Download Excel; Clear filters.</li></ul>
+</section>
+
+<section id="faq"><h2><span class="n">34</span>Problems and answers</h2>
 <table><tr><th>Problem</th><th>What to do</th></tr>
 <tr><td>Letters too small</td><td>Status chip → Text size → Large or Extra large.</td></tr>
 <tr><td>"N to sync" does not go away</td><td>Status chip → Sync now. If it says the login changed, sign in again (the waiting marks are kept).</td></tr>
