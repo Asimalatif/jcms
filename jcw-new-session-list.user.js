@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.9
+// @version      2.0
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
@@ -31,7 +31,7 @@
     snoStart: 1,                 // S.No of the first student (last S.No of Transform + 1)
     lastDate: '',                // last date of admission dd/mm/yyyy: fee paid after it = late (empty = everyone on time)
     evening: false,              // Evening Pre-Medical admitting this year? (late Pre-Medical students go to (E))
-    openSub: 85,                 // Pre-Medical subsidized Open Quota seats
+    seats: '',                   // seats of every quota (empty = DEFAULT_SEATS below); changed in the panel's Seats box
     subFee: 60000,               // Pre-Medical subsidized fee (all fee challans together); self-finance = 120000 (often 60000 paid + 60000 unpaid)
     feeFix: ''                   // fee date corrections, one per line: "name or portal ID, dd/mm/yyyy, note" (paid on time but the bank marked her late)
   };
@@ -58,17 +58,44 @@
   ];
   const COMPULSORY = ['ENGLISH', 'URDU', 'ISLAMIYAT', 'MUTALIA QURAN'];
   const OPEN = 'Open Quota', UOP = 'UoP Employee Quota';
-  /* Pre-Medical subsidized (S) seats of the special quotas; more students of a quota go to (M). UoP Employee Quota: no limit, always (S). */
-  const SUB_SEATS = { 'O-Level Quota': 6, 'Agriculture University Quota': 2, 'Disabled Quota': 1, 'FATA IN Quota': 2, 'Foreign Nationals': 2,
-    'Minority Quota': 1, 'Pakistan Forest Institute Quota': 2 };
-  /* seats shared by several programs (one merit list across them) */
-  const POOLS = { 'Afghan Quota': { seats: 5, programs: ['PMS', 'PE', 'FCS'] }, 'Sports Quota': { seats: 6, programs: ['FA', 'FCS', 'PE', 'PMS'] },
-    'UET Quota': { seats: 8, programs: ['FA', 'FCS', 'PE', 'PMS'] } };
-  /* seats of the special quotas in the other programs (only for the over-seat notes; Open Quota has no limit) */
-  const OTHER_SEATS = { FA: { 'Afghan Quota': 1, 'Agriculture University Quota': 1, 'Disabled Quota': 1, 'FATA IN Quota': 2, 'Foreign Nationals': 2,
-      'Minority Quota': 1, 'O-Level Quota': 2, 'Pakistan Forest Institute Quota': 1 }, PE: {}, FCS: {},
-    PMM: { 'Agriculture University Quota': 3, 'O-Level Quota': 8, 'UET Quota': 3 } };
-
+  /* SEATS: changed in the panel ("Seats" box), one line each:  "<sheet>: <quota> = <seats>"  or
+     "Shared (<sheet>, <sheet> …): <quota> = <seats>" for seats several programs share (one merit list across them).
+     Pre-Medical (S) lines are the subsidized seats (UoP Employee Quota: no limit, always (S)); Open Quota has no limit
+     except the Pre-Medical (S) Open seats. Other lines only check for over-filled quotas. */
+  const DEFAULT_SEATS = [
+    'Pre-Medical (S): Open Quota = 85', 'Pre-Medical (S): O-Level Quota = 6', 'Pre-Medical (S): Agriculture University Quota = 2',
+    'Pre-Medical (S): Disabled Quota = 1', 'Pre-Medical (S): FATA IN Quota = 2', 'Pre-Medical (S): Foreign Nationals = 2', 'Pre-Medical (S): Minority Quota = 1',
+    'Pre-Medical (S): Pakistan Forest Institute Quota = 2',
+    'Pre-Medical (M): Agriculture University Quota = 3', 'Pre-Medical (M): O-Level Quota = 8', 'Pre-Medical (M): UET Quota = 3',
+    'F.A: Afghan Quota = 5', 'F.A: Agriculture University Quota = 1', 'F.A: Disabled Quota = 1', 'F.A: FATA IN Quota = 2', 'F.A: Foreign Nationals = 2',
+    'F.A: Minority Quota = 1', 'F.A: O-Level Quota = 2', 'F.A: Pakistan Forest Institute Quota = 1',
+    'Shared (FCS, Pre-Engineering, Pre-Medical (S)): Afghan Quota = 5',
+    'Shared (F.A, FCS, Pre-Engineering, Pre-Medical (S)): Sports Quota = 6',
+    'Shared (F.A, FCS, Pre-Engineering, Pre-Medical (S)): UET Quota = 8'
+  ].join('\n');
+  /** the Seats text -> { open, sub: {quota: n} for (S), pools: {quota: {seats, programs}}, other: {sheetKey: {quota: n}} } */
+  function parseSeats(text, notes) {
+    const key = n => { const t = sp(n).toLowerCase().replace(/[^a-z()]/g, '');
+      return /premedical\(s\)|subsid/.test(t) ? 'PMS' : /premedical\(m\)|self/.test(t) ? 'PMM' : /premedical\(e\)|even/.test(t) ? 'PME'
+        : /engin|engg/.test(t) ? 'PE' : /fcs|computer/.test(t) ? 'FCS' : /^fa$|^f\.?a|arts/.test(t) ? 'FA' : ''; };
+    const out = { open: 0, sub: {}, pools: {}, other: { FA: {}, PE: {}, FCS: {}, PMM: {}, PME: {} } };
+    String(text || '').split(/\n/).map(l => l.trim()).filter(l => l && !/^\/\/|^#/.test(l)).forEach(l => {
+      const m = l.match(/^(shared\s*\((.+)\)|[^:]+?)\s*:\s*(.+?)\s*=\s*(\d+)\s*$/i);
+      if (!m) { notes.push([l, '', 'Seats', 'Not understood: write "F.A: Afghan Quota = 5" or "Shared (FCS, Pre-Engineering, Pre-Medical (S)): Afghan Quota = 5".']); return; }
+      const quota = quotaOf(m[3]), n = Number(m[4]);
+      if (m[2]) {
+        const progs = m[2].split(/,(?![^(]*\))/).map(key).filter(Boolean);
+        if (!progs.length) { notes.push([l, '', 'Seats', 'No program found inside Shared ( … ).']); return; }
+        out.pools[quota] = { seats: n, programs: progs };
+      } else {
+        const k = key(m[1]);
+        if (!k) { notes.push([l, '', 'Seats', 'Program not known: use F.A, Pre-Engineering, FCS, Pre-Medical (S), Pre-Medical (M) or Pre-Medical (E).']); return; }
+        if (k === 'PMS') { if (quota === OPEN) out.open = n; else out.sub[quota] = n; }
+        else out.other[k][quota] = n;
+      }
+    });
+    return out;
+  }
   const sp = v => String(v ?? '').replace(/\s+/g, ' ').trim();
   const numOf = v => { const n = parseFloat(String(v ?? '').replace(/,/g, '').replace(/[^\d.-]/g, '')); return Number.isFinite(n) ? n : null; };
   /** dd/mm/yyyy (or yyyy-mm-dd) -> yyyymmdd number for comparing; '' -> null */
@@ -79,7 +106,8 @@
     c = sp(c); if (!c) return OPEN;
     if (/^open|merit|general|self/i.test(c)) return OPEN;
     if (/uop|university of peshawar|employee/i.test(c) && !/agri|uet|engineering/i.test(c)) return UOP;
-    const known = Object.keys(SUB_SEATS).concat(Object.keys(POOLS));
+    const known = ['O-Level Quota', 'Agriculture University Quota', 'Disabled Quota', 'FATA IN Quota', 'Foreign Nationals', 'Minority Quota',
+      'Pakistan Forest Institute Quota', 'Afghan Quota', 'Sports Quota', 'UET Quota'];
     return known.find(k => k.toLowerCase() === c.toLowerCase()) || c.replace(/\b\w/g, x => x.toUpperCase());
   }
   function programKey(p) {
@@ -95,6 +123,8 @@
   function build(students, cfg) {
     cfg = Object.assign({}, DEFAULTS, cfg || {});
     const last = dkey(cfg.lastDate), notes = [];
+    const SEATS = parseSeats(cfg.seats || DEFAULT_SEATS, notes), SUB_SEATS = SEATS.sub, POOLS = SEATS.pools, OTHER_SEATS = SEATS.other;
+    if (!SEATS.open && cfg.openSub) SEATS.open = Number(cfg.openSub);   // older saved settings
     /* the receipt date she showed (FEE RECEIPT DATE + FEE DATE NOTE in Transform): it replaces the portal's fee date for the merit */
     const norm = v => sp(v).toLowerCase().replace(/[^a-z0-9]/g, ''), fix = new Map();
     String(cfg.feeFix || '').split(/\n/).map(l => l.trim()).filter(Boolean).forEach(l => {
@@ -148,7 +178,7 @@
     // Pre-Medical special quotas: their subsidized seats
     Object.keys(SUB_SEATS).forEach(q => giveSeats(PM.filter(o => o.quota === q), SUB_SEATS[q], o => !o.late));
     // the 85 Open Quota subsidized seats; a late student who paid the subsidized fee keeps her merit place (the fee decides)
-    used.cut = giveSeats(PM.filter(o => o.quota === OPEN && o.agg !== null), cfg.openSub, o => !o.late || o.subFee);
+    used.cut = giveSeats(PM.filter(o => o.quota === OPEN && o.agg !== null), SEATS.open, o => !o.late || o.subFee);
     PM.forEach(o => {
       let k = 'PMM';
       if (o.quota === UOP) k = 'PMS';
@@ -189,7 +219,7 @@
         const tie = {}; G.forEach(o => { (tie[o.agg] = tie[o.agg] || []).push(o); });
         Object.values(tie).forEach(T => { if (T.length > 1) T.sort((a, b) => (a.dob || 99999999) - (b.dob || 99999999)).forEach((o, i) => { o.agewise = ordinal(i + 1); }); });
         const inPool = POOLS[q] && POOLS[q].programs.includes(sh.key === 'PMM' || sh.key === 'PME' ? 'PMS' : sh.key);
-        const lim = sh.key === 'PMS' ? (q === OPEN ? cfg.openSub : q === UOP ? 'no limit' : inPool ? POOLS[q].seats + ' shared' : SUB_SEATS[q]) : (q === OPEN ? 'no limit' : q === UOP ? 'no limit' : inPool ? POOLS[q].seats + ' shared' : (OTHER_SEATS[sh.key] || {})[q]);
+        const lim = sh.key === 'PMS' ? (q === OPEN ? SEATS.open : q === UOP ? 'no limit' : inPool ? POOLS[q].seats + ' shared' : SUB_SEATS[q]) : (q === OPEN ? 'no limit' : q === UOP ? 'no limit' : inPool ? POOLS[q].seats + ' shared' : (OTHER_SEATS[sh.key] || {})[q]);
         if (typeof lim === 'number' && G.length > lim && sh.key !== 'PMS') notes.push(['', '', sh.name, q + ': ' + G.length + ' students for ' + lim + ' seat(s).']);
         seats.push([sh.name, q, byQ[q].length, lim == null ? '-' : lim, G.length ? G[0].agg : '', G.length ? G[G.length - 1].agg : '']);   // G is by Aggregate: first = highest
       });
@@ -400,7 +430,7 @@
   const box = document.createElement('div');
   box.id = 'jcwNew';
   box.innerHTML = `<style>
-    #jcwNew{position:fixed;left:16px;bottom:16px;z-index:99999;width:320px;background:#fff;color:#101828;border:1px solid #d0d5dd;border-radius:14px;box-shadow:0 12px 32px -12px rgba(16,24,40,.35);font:13.5px/1.4 system-ui,Segoe UI,Arial,sans-serif;padding:12px}
+    #jcwNew{position:fixed;left:16px;bottom:16px;z-index:99999;width:340px;max-height:92vh;overflow:auto;background:#fff;color:#101828;border:1px solid #d0d5dd;border-radius:14px;box-shadow:0 12px 32px -12px rgba(16,24,40,.35);font:13.5px/1.4 system-ui,Segoe UI,Arial,sans-serif;padding:12px}
     #jcwNew b.t{display:block;font-size:15px;margin-bottom:6px;color:#6B3423}
     #jcwNew label{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:4px 0;font-size:12.5px}
     #jcwNew input,#jcwNew select{width:130px;height:28px;border:1px solid #d0d5dd;border-radius:7px;padding:0 6px;font:inherit}
@@ -416,7 +446,9 @@
     <label>Enroll# year (JCW-F<i>yy</i>-) <input id="jnYear"></label>
     <label>First S.No <input id="jnSno" type="number"></label>
     <label>Last date of admission <input id="jnLast" placeholder="dd/mm/yyyy (optional)"></label>
-    <label>Pre-Medical (S) Open seats <input id="jnOpen" type="number"></label>
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;margin-top:4px"><span>Seats of every quota</span>
+      <span><a href="#" id="jnSeatsT" style="color:#6B3423;font-weight:700">Show / change</a> · <a href="#" id="jnSeatsR" style="color:#6B3423">Reset</a></span></div>
+    <textarea id="jnSeats" rows="10" style="display:none;width:100%;border:1px solid #d0d5dd;border-radius:7px;padding:4px 6px;font:11.5px ui-monospace,Consolas,monospace;resize:vertical;white-space:pre-wrap"></textarea>
     <label>Pre-Medical subsidized fee (Rs) <input id="jnFee" type="number"></label>
     <label>Evening Pre-Medical this year <input id="jnEve" type="checkbox"></label>
     <div style="font-size:12.5px;margin-top:4px">Fee date corrections (paid on time, bank marked late), one per line:</div>
@@ -430,10 +462,12 @@
   const $ = id => box.querySelector('#' + id);
   const say = (m, pct) => { $('jnMsg').textContent = m; if (pct != null) $('jnBar').style.width = Math.max(0, Math.min(100, pct)) + '%'; };
   const cfg = Object.assign({}, DEFAULTS, GM_getValue('jcwNewCfg', {}));
-  $('jnSes').value = cfg.session; $('jnYear').value = cfg.year; $('jnSno').value = cfg.snoStart; $('jnLast').value = cfg.lastDate; $('jnOpen').value = cfg.openSub; $('jnFee').value = cfg.subFee; $('jnEve').checked = !!cfg.evening; $('jnFix').value = cfg.feeFix || '';
+  $('jnSes').value = cfg.session; $('jnYear').value = cfg.year; $('jnSno').value = cfg.snoStart; $('jnLast').value = cfg.lastDate; $('jnSeats').value = cfg.seats || DEFAULT_SEATS; $('jnFee').value = cfg.subFee; $('jnEve').checked = !!cfg.evening; $('jnFix').value = cfg.feeFix || '';
   const readCfg = () => { const c = { session: sp($('jnSes').value), year: sp($('jnYear').value).replace(/\D/g, '').slice(-2), snoStart: Number($('jnSno').value) || 1, lastDate: sp($('jnLast').value),
-    openSub: Number($('jnOpen').value) || 0, subFee: Number($('jnFee').value) || 60000, evening: $('jnEve').checked, feeFix: $('jnFix').value }; GM_setValue('jcwNewCfg', c); return c; };
+    seats: $('jnSeats').value.trim() === DEFAULT_SEATS ? '' : $('jnSeats').value, subFee: Number($('jnFee').value) || 60000, evening: $('jnEve').checked, feeFix: $('jnFix').value }; GM_setValue('jcwNewCfg', c); return c; };
   $('jnMin').onclick = () => box.classList.toggle('min');
+  $('jnSeatsT').onclick = e => { e.preventDefault(); const t = $('jnSeats'); t.style.display = t.style.display === 'none' ? '' : 'none'; };
+  $('jnSeatsR').onclick = e => { e.preventDefault(); if (confirm('Put the standard seats back?')) { $('jnSeats').value = DEFAULT_SEATS; $('jnSeats').style.display = ''; readCfg(); } };
   let LIST = null, busy = false;
   const lock = on => { busy = on; ['jnList', 'jnGo', 'jnResume'].forEach(i => { $(i).disabled = on || (i === 'jnGo' && !LIST); }); };
   loadSaved().then(s => { if (s && s.items && Object.keys(s.done || {}).length < s.items.length) { $('jnResume').style.display = ''; $('jnResume').textContent = 'Resume (' + Object.keys(s.done).length + ' of ' + s.items.length + ' done)'; } });
