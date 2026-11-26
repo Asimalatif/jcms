@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>JCW Daily Attendance</title>
+<title>JCMS · Jinnah College Management System</title>
 <style>
   .addper{width:100%;height:36px;margin-top:8px;border-radius:10px;border:1px dashed rgba(255,255,255,.35);background:transparent;color:rgba(255,255,255,.85);font-weight:650;font-size:12.5px}
 .phint{margin-top:6px;font-size:11.5px;line-height:1.35;color:rgba(255,255,255,.7)}
@@ -1389,7 +1389,7 @@ function openMyReports(){
 const render = () => authed() ? renderMain() : renderLogin();
 function renderLogin(msg){
   compact = false; $('#app').classList.remove('phid', 'compact');
-  $('#app').innerHTML = `<div class="login"><h1>JCW Daily Attendance</h1>
+  $('#app').innerHTML = `<div class="login"><h1>JCMS</h1><div class="sub" style="margin:-6px 0 10px;font-weight:600">Jinnah College Management System</div>
     <p>Sign in once while you have internet, with the same username and password as the portal. After that the app works offline.</p>
     <label for="user">Username</label><input id="user" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" value="${esc(store.get('lastUser', ''))}">
     <label for="pass">Password</label><input id="pass" type="password" autocomplete="current-password">
@@ -1584,7 +1584,7 @@ const perBar = (mode !== 'att' || !hasMulti()) ? '' :
   $('#app').innerHTML = `
     <div class="stick">
       <header class="top"><div class="row1">
-        <div class="ttl"><h1>JCW Daily Attendance</h1>${teacher ? `<div class="teacher">${greet()}, ${esc(teacher)}${isAdmin ? ' (admin)' : ''}</div>` : ''}</div>
+        <div class="ttl"><h1>JCMS <small style="font-size:.55em;font-weight:600;opacity:.8">Jinnah College Management System</small></h1>${teacher ? `<div class="teacher">${greet()}, ${esc(teacher)}${isAdmin ? ' (admin)' : ''}</div>` : ''}</div>
         <button class="hideBtn" id="panelBtn" aria-expanded="${!panelHidden}" aria-label="${panelHidden ? 'Show' : 'Hide'} controls" title="${panelHidden ? 'Show' : 'Hide'} controls"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
         <button class="sync" id="statusChip" aria-label="Account and sync"><span class="dot"></span><span id="statusTxt"></span></button>
       </div></header>
@@ -6170,7 +6170,7 @@ async function remindTeacher(name){
   const w = waNum(c); if(!w) return toast('No WhatsApp number for ' + name + '.');
   const T = teachersAgg(ovRows().filter(r => r.sched !== false)).find(t => nkey(t.name) === nkey(name));
   const left = T ? T.rows.filter(r => !r.today).map(r => r.cls + ' ' + titleCase(r.sub)) : [];
-  const msg = 'Assalam-o-Alaikum ' + name + ',\nToday\'s attendance (' + fmtDate(new Date()) + ') is not marked yet' + (left.length ? ' for:\n- ' + left.join('\n- ') : '.') + '\nPlease mark it in the JCW attendance app.\n- ' + (teacher || user) + (scope === 'all' ? (isAdmin ? ' (Admin)' : ' (Principal)') : isCP ? ' (Chief Proctor)' : scope === 'dept' ? ' (HOD)' : '');
+  const msg = 'Assalam-o-Alaikum ' + name + ',\nToday\'s attendance (' + fmtDate(new Date()) + ') is not marked yet' + (left.length ? ' for:\n- ' + left.join('\n- ') : '.') + '\nPlease mark it in JCMS (the JCW app).\n- ' + (teacher || user) + (scope === 'all' ? (isAdmin ? ' (Admin)' : ' (Principal)') : isCP ? ' (Chief Proctor)' : scope === 'dept' ? ' (HOD)' : '');
   const url = /wa\.me\//.test(w) ? w + '?text=' + encodeURIComponent(msg) : w;
   window.open(url, '_blank', 'noopener');
 }

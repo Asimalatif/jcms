@@ -1,7 +1,7 @@
 {
-  "name": "CS Attendance",
-  "short_name": "Attendance",
-  "description": "Offline attendance and monthly test marks for JCW teachers",
+  "name": "JCMS · Jinnah College Management System",
+  "short_name": "JCMS",
+  "description": "Jinnah College Management System: attendance, tests, admissions, certificates, reports and more for JCW",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -9,7 +9,17 @@
   "background_color": "#FBF3F1",
   "theme_color": "#6B3423",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
