@@ -2334,25 +2334,59 @@ function mlShiftRows(c, all, cand){
 function mlShiftAsk(c, refund){
   if(!c) return;
   const d = new Date(), today = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
-  const cnt = () => mlShiftRows(c, $('#shAll').checked, $('#shCand').checked).length;
+  // v8.50 continuation letter: students already in an earlier letter (letters made on this device + earlier Word letters you pick) are left out
+  const sent = mlSentGet(), up = new Set(), last = sent[sent.length - 1] || null;
+  const isCont = () => !refund && $('#shCont') && $('#shCont').checked;
+  const keep = L => isCont() ? L.filter(x => { const k = mlSentKey(x.o.name, x.o.father); return !up.has(k) && !sent.some(l => l.keys.includes(k)); }) : L;
+  const cnt = () => keep(mlShiftRows(c, $('#shAll').checked, $('#shCand').checked)).length;
   dlgOpen(`<h2>${refund ? 'Half-fee refund list' : 'Shifting letter (Word)'}</h2>
     ${refund ? '<div class="sub">Students on a subsidized seat who paid the non-subsidized fee, with the amount to refund, highest Aggregate first. Students whose matric marks alone are below the merit but whose HQ (+20) marks put them on a seat are marked, with their Aggregate.</div>' : ''}
     <div class="sub"${refund ? ' style="display:none"' : ''}>Your letter to <b>The Director Admissions, University of Peshawar</b>: "students are hereby shifted from F.Sc-I (Non-subsidized, Morning) to F.Sc-I (subsidized, Morning) on <i>date</i>", with S.No, Student Name, Father Name and Marks (obtained / total matric marks, e.g. 1146/1200; the quota is written after the marks when it is not Open Quota). Students: on a subsidized seat but paid the non-subsidized fee, each quota together (Open Quota first, then O-Level, Sports …), highest Aggregate first inside each quota.</div>
     <label class="f"${refund ? ' style="display:none"' : ''}>Date of shifting<input id="shDate" value="${today}" style="height:42px"></label>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="shAll"> Also the other subsidized quotas (Minority, O-Level, …): their students on a seat who paid the non-subsidized fee</label>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="shCand"> Also the possible candidates for the empty seats</label>
+    ${refund ? '' : `<label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="shCont"> <b>Continuation letter</b>: only students NOT in an earlier letter, with "In continuation of this office letter No. … dated …"</label>
+    <div id="shContBox" style="display:none;border:1px solid var(--line,#ddd);border-radius:10px;padding:8px 10px;margin:4px 0 8px">
+      <label class="f">Earlier letter No. (reference)<input id="shRef" value="${esc(ls.get('shRefNo', ''))}" placeholder="e.g. JCW/Adm/1234" style="height:40px"></label>
+      <label class="f">Dated<input id="shRefDate" value="${esc(last ? last.date : '')}" placeholder="dd.mm.yyyy" style="height:40px"></label>
+      <label class="f">Earlier letter(s) already sent (Word files): their students are left out<input type="file" id="shPrev" accept=".docx" multiple></label>
+      <div class="sub" id="shPrevN">${sent.length ? 'Letters made on this device are left out by themselves: ' + sent.map(l => l.date + ' (' + l.keys.length + ')').join(', ') + '.' : 'Pick the letter you already sent (e.g. Shifting of students … 17.11.2026.docx).'}</div>
+    </div>`}
     <div class="sub">Without ticks: only <b>${esc(c.label)} · ${esc(c.quota)}</b>. The possible candidates (yellow rows, e.g. serial 84 and 85) are the students for the empty seats of this list only.</div>
     <div class="sub" id="shN"></div>
     <div class="acts"><button class="btn primary" id="shGo">${refund ? 'Make the refund list' : 'Make the Word letter'}</button><button class="btn" id="shX">Close</button></div>`);
   const upd = () => { $('#shN').textContent = cnt() + ' students will be in the ' + (refund ? 'refund list.' : 'letter.'); };
   $('#shAll').onchange = upd; $('#shCand').onchange = upd; upd();
+  if($('#shCont')){ $('#shCont').onchange = () => { $('#shContBox').style.display = $('#shCont').checked ? '' : 'none'; if($('#shCont').checked) $('#shAll').checked = true; upd(); };
+    $('#shPrev').onchange = async ev => { try{ let n = 0, dt = '';
+        for(const f of ev.target.files){ const r = await mlLetterNames(f); r.keys.forEach(k => up.add(k)); n += r.keys.length; if(r.date) dt = r.date; }
+        if(dt && !$('#shRefDate').value) $('#shRefDate').value = dt;
+        $('#shPrevN').textContent = n + ' students read from the earlier letter(s): they are left out.' + (sent.length ? ' Letters made on this device too.' : ''); upd(); }
+      catch(e){ toast('Could not read the letter: ' + (e.message || e)); } }; }
   $('#shX').onclick = dlgClose;
   $('#shGo').onclick = async () => { const b = $('#shGo'); b.disabled = true; b.textContent = 'Making…';
-    try{ const L = mlShiftRows(c, $('#shAll').checked, $('#shCand').checked); if(refund){ mlRefundOut(c, L, $('#shAll').checked); dlgClose(); return; }
-      await mlShiftWord(L, $('#shDate').value.trim() || today); dlgClose(); }
+    try{ const L = keep(mlShiftRows(c, $('#shAll').checked, $('#shCand').checked)); if(refund){ mlRefundOut(c, L, $('#shAll').checked); dlgClose(); return; }
+      const ref = isCont() ? { no:$('#shRef').value.trim(), date:$('#shRefDate').value.trim() } : null;
+      if(ref) ls.set('shRefNo', ref.no);
+      if(isCont() && !L.length) throw new Error('Every student is already in an earlier letter.');
+      const dt = $('#shDate').value.trim() || today;
+      await mlShiftWord(L, dt, ref); mlSentAdd(dt, L.map(x => mlSentKey(x.o.name, x.o.father))); dlgClose(); }
     catch(e){ toast('Not made: ' + (e.message || e)); b.disabled = false; b.textContent = refund ? 'Make the refund list' : 'Make the Word letter'; } };
 }
-async function mlShiftWord(list, date){
+/* v8.50 students already sent in a shifting letter: kept on this device; earlier Word letters can be read too */
+const mlSentKey = (n, f) => String(n || '').toLowerCase().replace(/[^a-z]/g, '') + '|' + String(f || '').toLowerCase().replace(/[^a-z]/g, '');
+function mlSentGet(){ try{ return JSON.parse(localStorage.getItem('jcw_shift_sent') || '[]'); }catch(e){ return []; } }
+function mlSentAdd(date, keys){ try{ const a = mlSentGet().filter(l => l.date !== date || l.keys.join() !== keys.join()); a.push({ date, keys }); localStorage.setItem('jcw_shift_sent', JSON.stringify(a.slice(-20))); }catch(e){} }
+async function mlLetterNames(file){
+  if(!window.JSZip) await mlLoadJs('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+  const z = await JSZip.loadAsync(await file.arrayBuffer()), x = await z.file('word/document.xml').async('string'), keys = [];
+  const cellTxt = c => (c.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('');
+  (x.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g) || []).forEach(tr => { const cs = (tr.match(/<w:tc>[\s\S]*?<\/w:tc>/g) || []).map(cellTxt);
+    if(cs.length >= 3 && cs[1] && !/student\s*name/i.test(cs[1])) keys.push(mlSentKey(cs[1], cs[2])); });
+  const body = x.replace(/<[^>]+>/g, ''), m = body.match(/Morning\)\s*on\s*(\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4})/) || String(file.name).match(/(\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4})/);
+  return { keys, date:m ? m[1] : '' };
+}
+async function mlShiftWord(list, date, ref){
   if(!list.length) throw new Error('No students to shift.');
   if(!window.JSZip) await mlLoadJs('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
   const res = await fetch('templates/shifting-letter.docx', { cache:'no-cache' }); if(!res.ok) throw new Error('The letter template is missing (templates/shifting-letter.docx).');
@@ -2364,10 +2398,11 @@ async function mlShiftWord(list, date){
     return pat.replace('{NAME}', xe(it.o.name)).replace('{FATHER}', xe(it.o.father || '')).replace('{MARKS}', xe(String(it.o.metric || '').replace(/\.0+$/, '') + (it.o.total ? '/' + String(it.o.total).replace(/\.0+$/, '') : '') + (it.hqHelp ? ' + 20 HQ, Aggregate ' + it.o._a / 100 + '%' : '')) + (q ? ' ' : ''))   // obtained / total, e.g. 1146/1200
       .replace('{QUOTA}', q ? xe('(' + q + ')') : ''); });
   x = x.slice(0, s) + rows.join('') + x.slice(e);
+  if(ref) x = x.replace('It is for information that following students are hereby shifted', xe('In continuation of this office letter' + (ref.no ? ' No. ' + ref.no : '') + (ref.date ? ' dated ' + ref.date : '') + ', it is for information that the following students are also hereby shifted'));
   x = x.replace('{DATE}', xe(date));
   z.file(f, x);
   const blob = await z.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-  const name = 'Shifting of students non-subsidized to subsidized ' + date.replace(/[\/]/g, '.') + '.docx';
+  const name = 'Shifting of students non-subsidized to subsidized ' + (ref ? '(continuation) ' : '') + date.replace(/[\/]/g, '.') + '.docx';
   if(window.JCWOUT) JCWOUT.offer({ blob, name, title:'Shifting letter (Word)', sub:list.length + ' students · ' + date, noPdf:true, noXl:true,
     extra:[{ label:'Download', fn:() => { JCWOUT.download(blob, name); toast('Downloaded: ' + name); } }, { label:'Open / share', fn:() => JCWOUT.share(blob, name, 'Shifting letter') }] });
   else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); }
