@@ -1,13 +1,16 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      2.0
+// @version      2.1
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
 // @require      https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js
+// @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @connect      script.google.com
+// @connect      script.googleusercontent.com
 // @run-at       document-idle
 // ==/UserScript==
 /*
@@ -22,6 +25,10 @@
   const LIST_PAGE_SIZE = 500, CONCURRENCY = 4;
   const PHOTO_BASE_URL = 'https://portal.uop.edu.pk/images/StudentPhoto/';
   const SAVE_KEY = 'JCW-NEWLIST-1';
+  const API = 'https://script.google.com/macros/s/AKfycbzl-DwgASIhf-pIGYi9D3M-CGOm7d7-UKg0W-OoWAiuRBHe4mjlRgMQXIHuLm6zi--i/exec';
+  /* the attendance app's program keys (Seat settings tab) -> the sheet names of this script */
+  const APP_PROGRAM = { 'Pre Medical Open': 'Pre-Medical (S)', 'Self Morning Medical': 'Pre-Medical (M)', 'Evening Pre Medical': 'Pre-Medical (E)',
+    'FCS': 'FCS', 'FA': 'F.A', 'Pre Engg': 'Pre-Engineering' };
 
 /*ENGINE-START*/
   /* ===================== SETTINGS (the panel can change the first ones; they are remembered) ===================== */
@@ -447,7 +454,8 @@
     <label>First S.No <input id="jnSno" type="number"></label>
     <label>Last date of admission <input id="jnLast" placeholder="dd/mm/yyyy (optional)"></label>
     <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;margin-top:4px"><span>Seats of every quota</span>
-      <span><a href="#" id="jnSeatsT" style="color:#6B3423;font-weight:700">Show / change</a> · <a href="#" id="jnSeatsR" style="color:#6B3423">Reset</a></span></div>
+      <span><a href="#" id="jnSeatsA" style="color:#6B3423;font-weight:700" title="Read the seats from the attendance app's Seat settings tab">From the app</a> · <a href="#" id="jnSeatsT" style="color:#6B3423">Show</a> · <a href="#" id="jnSeatsR" style="color:#6B3423">Reset</a></span></div>
+    <div id="jnSeatsS" style="font-size:11.5px;color:#475467"></div>
     <textarea id="jnSeats" rows="10" style="display:none;width:100%;border:1px solid #d0d5dd;border-radius:7px;padding:4px 6px;font:11.5px ui-monospace,Consolas,monospace;resize:vertical;white-space:pre-wrap"></textarea>
     <label>Pre-Medical subsidized fee (Rs) <input id="jnFee" type="number"></label>
     <label>Evening Pre-Medical this year <input id="jnEve" type="checkbox"></label>
@@ -467,10 +475,40 @@
     seats: $('jnSeats').value.trim() === DEFAULT_SEATS ? '' : $('jnSeats').value, subFee: Number($('jnFee').value) || 60000, evening: $('jnEve').checked, feeFix: $('jnFix').value }; GM_setValue('jcwNewCfg', c); return c; };
   $('jnMin').onclick = () => box.classList.toggle('min');
   $('jnSeatsT').onclick = e => { e.preventDefault(); const t = $('jnSeats'); t.style.display = t.style.display === 'none' ? '' : 'none'; };
+  $('jnSeatsA').onclick = async e => { e.preventDefault(); await appSeats(true); };
   $('jnSeatsR').onclick = e => { e.preventDefault(); if (confirm('Put the standard seats back?')) { $('jnSeats').value = DEFAULT_SEATS; $('jnSeats').style.display = ''; readCfg(); } };
   let LIST = null, busy = false;
   const lock = on => { busy = on; ['jnList', 'jnGo', 'jnResume'].forEach(i => { $(i).disabled = on || (i === 'jnGo' && !LIST); }); };
   loadSaved().then(s => { if (s && s.items && Object.keys(s.done || {}).length < s.items.length) { $('jnResume').style.display = ''; $('jnResume').textContent = 'Resume (' + Object.keys(s.done).length + ' of ' + s.items.length + ' done)'; } });
+
+  /* ===================== SEATS FROM THE ATTENDANCE APP (Seat settings tab; read only, with the sync key) ===================== */
+  function askKey(force) {
+    let k = GM_getValue('jcwKey', '');
+    if (!k || force) { const n = prompt('Sync key from the JCW attendance app\n(College > UOP portal sync > Get sync key):', k || ''); if (n == null) return k; k = n.trim(); GM_setValue('jcwKey', k); }
+    return k;
+  }
+  function gmPost(body) {
+    return new Promise((res, rej) => GM_xmlhttpRequest({ method: 'POST', url: API, data: JSON.stringify(body), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, timeout: 120000,
+      onload: r => { try { res(JSON.parse(r.responseText)); } catch (e) { rej(new Error('The attendance server sent a web page instead of data.')); } },
+      onerror: () => rej(new Error('No connection to the attendance server.')), ontimeout: () => rej(new Error('The attendance server took too long.')) }));
+  }
+  /** reads Quota Settings + Seat Pools (the Seat settings tab) into the Seats box; true when it worked */
+  async function appSeats(ask) {
+    const key = ask ? askKey(!GM_getValue('jcwKey', '')) : GM_getValue('jcwKey', '');
+    if (!key) { $('jnSeatsS').textContent = 'Seats: from the box below (press "From the app" to read the Seat settings tab).'; return false; }
+    $('jnSeatsS').textContent = 'Reading the seats from the attendance app …';
+    try {
+      const r = await gmPost({ action: 'portal_seats', key });
+      if (!r.ok) { if (/key/i.test(r.error || '')) GM_setValue('jcwKey', ''); throw new Error(r.error || 'Server error'); }
+      const L = [];
+      r.rows.forEach(x => { const n = APP_PROGRAM[x.program] || x.program; if (x.seats !== '' && !isNaN(Number(x.seats))) L.push(n + ': ' + x.quota + ' = ' + Number(x.seats)); });
+      (r.pools || []).forEach(p => { if (p.seats !== '' && !isNaN(Number(p.seats))) L.push('Shared (' + p.members.map(m => APP_PROGRAM[m] || m).join(', ') + '): ' + p.quota + ' = ' + Number(p.seats)); });
+      if (!L.length) throw new Error('The Seat settings tab has no seats.');
+      $('jnSeats').value = L.join('\n'); readCfg();
+      $('jnSeatsS').textContent = 'Seats read from the app\'s Seat settings tab (' + L.length + ' lines) on ' + new Date().toLocaleString('en-GB') + '.';
+      return true;
+    } catch (e) { $('jnSeatsS').textContent = 'Could not read the app\'s seats (' + e.message + '): using the box below.'; return false; }
+  }
 
   $('jnList').onclick = async () => {
     if (busy) return; lock(true);
@@ -486,6 +524,7 @@
   async function run(S) {
     lock(true);
     try {
+      if (await appSeats(false)) S.cfg.seats = readCfg().seats;      // always the latest Seat settings of the app
       const todo = S.items.filter(it => !S.done[it.id || it.row['Enrollment#'] || it.row['Student Name']]), total = S.items.length;
       let i = 0, n = total - todo.length, stop = null; const t0 = Date.now(), start = n;
       const worker = async () => {
