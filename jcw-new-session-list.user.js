@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.7
+// @version      1.8
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
@@ -117,34 +117,41 @@
     const sheetOf = new Map();
     // 1. Pre-Medical: UoP Employee -> (S); special quotas -> (S) up to their seats; top Open Quota (on time) -> (S)
     const PM = S.filter(o => o.pk === 'PM'), used = {};
-    const pool = {}; Object.keys(POOLS).forEach(q => { pool[q] = 0; });
-    // pooled quotas: one merit list across the programs of the pool (all programs, in merit order)
-    S.filter(o => POOLS[o.quota] && POOLS[o.quota].programs.includes(o.pk === 'PM' ? 'PMS' : o.pk)).forEach(o => {   // a program outside the pool uses its own seats
-      const P = POOLS[o.quota];
-      if (!o.late && pool[o.quota] < P.seats) { pool[o.quota]++; o.inPool = true; }
-      else if (o.pk !== 'PM') notes.push([o.s['Student Name'], o.s['Father Name'], o.s['Program'], o.quota + ': outside the ' + P.seats + ' shared seats (' + P.programs.join(', ') + '). Check her quota.']);
+    /* limited seats: first the students who are on time (merit order: Aggregate, then older first); a late student gets a seat only
+       if one is still empty after them (late ones by Aggregate, then fee date, then age). Late counts only when seats are short. */
+    const byMerit = (a, b) => ((b.agg ?? -1) - (a.agg ?? -1)) || ((a.dob || 99999999) - (b.dob || 99999999)) || ((a.fee || 99999999) - (b.fee || 99999999));
+    const byLate = (a, b) => ((b.agg ?? -1) - (a.agg ?? -1)) || ((a.fee || 99999999) - (b.fee || 99999999)) || ((a.dob || 99999999) - (b.dob || 99999999));
+    function giveSeats(list, seats, onTime) {
+      let n = 0, cut = null;
+      list.filter(onTime).sort(byMerit).concat(list.filter(o => !onTime(o)).sort(byLate)).forEach(o => {
+        if (n < seats) { n++; o.seat = true; o.lateSeat = !onTime(o); if (o.agg !== null) cut = o.agg; }
+      });
+      return cut;
+    }
+    // shared seats (Afghan, Sports, UET): one merit list across the programs of the pool; a program outside the pool uses its own seats
+    Object.keys(POOLS).forEach(q => {
+      const P = POOLS[q], L = S.filter(o => o.quota === q && P.programs.includes(o.pk === 'PM' ? 'PMS' : o.pk));
+      giveSeats(L, P.seats, o => !o.late);
+      L.forEach(o => { if (!o.seat && o.pk !== 'PM') notes.push([o.s['Student Name'], o.s['Father Name'], o.s['Program'], q + ': outside the ' + P.seats + ' shared seats (' + P.programs.join(', ') + '). Check her quota.']); });
     });
-    /* the 85 Open Quota subsidized seats: by Aggregate (older first on equal Aggregate); a late student keeps her merit place only if she
-       paid the subsidized fee (the fee decides), otherwise the seat goes to the next on-time student */
-    PM.filter(o => o.quota === OPEN && o.agg !== null).sort((a, b) => (b.agg - a.agg) || ((a.dob || 99999999) - (b.dob || 99999999)) || ((a.fee || 99999999) - (b.fee || 99999999)))
-      .forEach(o => { if ((used.open || 0) < cfg.openSub && (!o.late || o.subFee)) { used.open = (used.open || 0) + 1; o.openSeat = true; used.cut = o.agg; } });
+    // Pre-Medical special quotas: their subsidized seats
+    Object.keys(SUB_SEATS).forEach(q => giveSeats(PM.filter(o => o.quota === q), SUB_SEATS[q], o => !o.late));
+    // the 85 Open Quota subsidized seats; a late student who paid the subsidized fee keeps her merit place (the fee decides)
+    used.cut = giveSeats(PM.filter(o => o.quota === OPEN && o.agg !== null), cfg.openSub, o => !o.late || o.subFee);
     PM.forEach(o => {
       let k = 'PMM';
       if (o.quota === UOP) k = 'PMS';
-      else if (POOLS[o.quota]) k = o.inPool ? 'PMS' : 'PMM';
-      else if (SUB_SEATS[o.quota] !== undefined) { used[o.quota] = used[o.quota] || 0; if (!o.late && used[o.quota] < SUB_SEATS[o.quota]) { used[o.quota]++; k = 'PMS'; } }
-      else if (o.quota === OPEN) {
-        if (o.openSeat) {
-          k = 'PMS';
-          if (o.late) notes.push([o.s['Student Name'], o.s['Father Name'], 'Pre-Medical (S)', 'Paid on ' + sp(o.s['Fee Paid Date']) + ', after the last date of admission (' + cfg.lastDate + '), but paid the subsidized fee: kept on her Open Quota merit seat (Aggregate ' + o.agg + ').']);
-        }
+      else if (o.seat) {
+        k = 'PMS';
+        if (o.late) notes.push([o.s['Student Name'], o.s['Father Name'], 'Pre-Medical (S) · ' + o.quota, 'Paid on ' + sp(o.s['Fee Paid Date']) + ', after the last date of admission (' + cfg.lastDate + '): ' +
+          (o.lateSeat ? 'a subsidized seat was still empty after the on-time students, so she got it.' : 'she paid the subsidized fee, so she keeps her merit seat (Aggregate ' + o.agg + ').')]);
       }
       // the fee she paid decides (every quota): subsidized fee -> (S); in (S) but paid the self-finance fee -> stays, flagged
       const rs = n => 'Rs ' + n.toLocaleString('en-US');
       if (k !== 'PMS' && o.subFee) {
         k = 'PMS'; o.flag = 'yellow';
         const paid = 'Paid the subsidized fee (' + rs(o.feeTotal) + ')';
-        o.why = o.late ? paid + ' on ' + sp(o.s['Fee Paid Date']) + ', after the last date of admission (' + cfg.lastDate + '), so the merit list gave the subsidized seats to on-time students (her Aggregate ' + (o.agg ?? '-') + '). Kept in Pre-Medical (S). Check whether her late admission was allowed on a subsidized seat, or her quota.'
+        o.why = o.late ? paid + ' on ' + sp(o.s['Fee Paid Date']) + ', after the last date of admission (' + cfg.lastDate + '), and every ' + o.quota + ' subsidized seat was taken by on-time students (her Aggregate ' + (o.agg ?? '-') + '). Kept in Pre-Medical (S). Check whether her late admission was allowed on a subsidized seat, or her quota.'
           : o.agg === null ? paid + ' but she has no matric marks on the portal, so she has no merit. Kept in Pre-Medical (S). Add her marks and check her quota.'
           : o.quota === OPEN ? paid + ' but her Aggregate ' + o.agg + ' is below the Open Quota subsidized merit (' + used.cut + '): she must be on another quota. Kept in Pre-Medical (S). Ask her and change the Quota.'
           : paid + ' but the ' + o.quota + ' subsidized seats are full (her Aggregate ' + o.agg + '): kept in Pre-Medical (S). Check her quota and seat.';
