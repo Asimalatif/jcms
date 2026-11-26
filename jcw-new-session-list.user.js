@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.8
+// @version      1.9
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
@@ -32,7 +32,8 @@
     lastDate: '',                // last date of admission dd/mm/yyyy: fee paid after it = late (empty = everyone on time)
     evening: false,              // Evening Pre-Medical admitting this year? (late Pre-Medical students go to (E))
     openSub: 85,                 // Pre-Medical subsidized Open Quota seats
-    subFee: 60000                // Pre-Medical subsidized fee (all fee challans together); self-finance = 120000 (often 60000 paid + 60000 unpaid)
+    subFee: 60000,               // Pre-Medical subsidized fee (all fee challans together); self-finance = 120000 (often 60000 paid + 60000 unpaid)
+    feeFix: ''                   // fee date corrections, one per line: "name or portal ID, dd/mm/yyyy, note" (paid on time but the bank marked her late)
   };
   const TRANSFORM_HEAD = ['S.No', 'Enroll#', 'Student Name', 'Father Name', 'Program/Class/Section', 'Program', 'Class', 'Section', 'PCS',
     'Sub1', 'Sub2', 'Sub3', 'Sub4', 'Sub5', 'Sub6', 'Sub7', 'Appeared in', 'Quota', 'DOB', 'GroupOnly', 'Obtained Marks', 'Total Marks', 'MeritNo', 'HQ',
@@ -94,19 +95,29 @@
   function build(students, cfg) {
     cfg = Object.assign({}, DEFAULTS, cfg || {});
     const last = dkey(cfg.lastDate), notes = [];
+    /* the receipt date she showed (FEE RECEIPT DATE + FEE DATE NOTE in Transform): it replaces the portal's fee date for the merit */
+    const norm = v => sp(v).toLowerCase().replace(/[^a-z0-9]/g, ''), fix = new Map();
+    String(cfg.feeFix || '').split(/\n/).map(l => l.trim()).filter(Boolean).forEach(l => {
+      const p = l.split(/\s*[,;|\t]\s*/), who = p[0], date = (p.slice(1).join(' ').match(/\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}/) || [])[0];
+      if (!who || !date) { notes.push([l, '', 'Fee date corrections', 'Not understood: write "name or portal ID, dd/mm/yyyy, note".']); return; }
+      const hit = students.filter(s => sp(s['Student Id']) === sp(who) || norm(s['Student Name']) === norm(who) || norm(s['Student Name'] + s['Father Name']) === norm(who));
+      if (hit.length !== 1) { notes.push([who, '', 'Fee date corrections', hit.length ? hit.length + ' students have this name: write her portal ID instead.' : 'No student with this name or portal ID.']); return; }
+      fix.set(hit[0], { date: date.replace(/[.-]/g, '/'), note: p.slice(1).join(', ').replace(date, '').replace(/^[\s,;]+|[\s,;]+$/g, '') });
+    });
     const S = students.map(s => {
       const obt = numOf(s['Obtain Marks/CGPA']), tot = numOf(s['Total Marks/CGPA']), hq = /^y/i.test(s['HQ'] || '') ? 'Yes' : 'No';
       const agg = obt !== null && tot ? Math.round((obt + (hq === 'Yes' ? 20 : 0)) * 100 / tot * 100) / 100 : null;
-      const fee = dkey(s['Fee Paid Date']), dob = dkey(s['DOB']);
+      const fx = fix.get(s), fee = dkey(fx ? fx.date : s['Fee Paid Date']), dob = dkey(s['DOB']);
       // fee challans above Rs 3,000 (paid P- and unpaid U-): their total says subsidized (60,000) or self-finance (120,000)
       let feeTotal = 0, feePaid = 0;
       String(s['Challan Details'] || '').split(',').forEach(c => { const m = c.trim().match(/^([PU])-([\d.]+)/i); if (!m || +m[2] <= 3000) return; feeTotal += +m[2]; if (/p/i.test(m[1])) feePaid += +m[2]; });
       const quota = quotaOf(s['Category']), emp = quota === UOP;   // UoP employees: always subsidized, they pay no fee (the portal's challans for them mean nothing)
-      const o = { s, pk: programKey(s['Program']), quota, emp, hq, obt, tot, agg, dob, fee, late: !emp && !!(last && fee && fee > last), flag: '', why: '',
+      const o = { s, fx, pk: programKey(s['Program']), quota, emp, hq, obt, tot, agg, dob, fee, late: !emp && !!(last && fee && fee > last), flag: '', why: '',
         feeTotal, subFee: !emp && feePaid > 0 && feeTotal <= Number(cfg.subFee || 60000) };
       if (emp && agg !== null && agg < 50) { o.flag = 'red'; o.why = 'UoP Employee Quota needs at least 50% marks: her Aggregate is ' + agg + '. Kept on the subsidized seat; check her admission.'; }
       if (agg === null) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No matric marks on the portal: Aggregate and merit left empty, put at the end of the list.']);
       if (!dob) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No date of birth on the portal (age decides equal Aggregates).']);
+      if (fx) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'Fee date corrected by you: ' + fx.date + ' (portal: ' + (sp(s['Fee Paid Date']) || 'none') + ')' + (fx.note ? ' · ' + fx.note : '') + '.']);
       if (!fee && !emp) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No paid admission fee (above Rs 3,000) found on the portal.']);
       return o;
     }).filter(o => { if (!o.pk) { notes.push([o.s['Student Name'], o.s['Father Name'], o.s['Program'], 'Program not known: left out.']); return false; } return true; });
@@ -195,7 +206,8 @@
           .concat(subs.slice(0, 7))
           .concat([sh.appeared, o.quota, sp(s['DOB']), '', o.obt ?? '', o.tot ?? '', o.merit ?? '', o.hq, o.agg ?? '', sec[2], photo, roll, sp(s['Batch']), cfg.session, 'Enrolled',
             sp(s['StudentContact']), sp(s['EmailAddress']), photo, sp(s['Board / University']), sp(s['Passing Year']), sp(s['Roll.No.']), o.agg ?? '',
-            sp(s['Challan Details']), sp(s['Student Id']), o.agewise || '', sp(s['Fee Paid Date']), '', o.late ? 'Late admission (fee after ' + cfg.lastDate + ')' : '']);
+            sp(s['Challan Details']), sp(s['Student Id']), o.agewise || '', sp(s['Fee Paid Date']), o.fx ? o.fx.date : '',
+            o.fx ? (o.fx.note || 'Fee receipt date shown by the student') : o.late ? 'Late admission (fee after ' + cfg.lastDate + ')' : '']);
       });
     });
     return { sheets: out, notes, seats, marks };   // marks: [row (0 = first student), colour] whose Quota cell is highlighted
@@ -407,6 +419,8 @@
     <label>Pre-Medical (S) Open seats <input id="jnOpen" type="number"></label>
     <label>Pre-Medical subsidized fee (Rs) <input id="jnFee" type="number"></label>
     <label>Evening Pre-Medical this year <input id="jnEve" type="checkbox"></label>
+    <div style="font-size:12.5px;margin-top:4px">Fee date corrections (paid on time, bank marked late), one per line:</div>
+    <textarea id="jnFix" rows="3" placeholder="Eishaal Wali, 24/08/2026, bank marked her late&#10;or portal ID: 12345, 24/08/2026" style="width:100%;border:1px solid #d0d5dd;border-radius:7px;padding:4px 6px;font:12px system-ui;resize:vertical"></textarea>
     <label>Batch of the new 1st Year <select id="jnBatch"><option value="">(read the list first)</option></select></label>
     <button id="jnList">1. Read the list</button>
     <button class="p" id="jnGo" disabled>2. Read details &amp; make the Excel file</button>
@@ -416,9 +430,9 @@
   const $ = id => box.querySelector('#' + id);
   const say = (m, pct) => { $('jnMsg').textContent = m; if (pct != null) $('jnBar').style.width = Math.max(0, Math.min(100, pct)) + '%'; };
   const cfg = Object.assign({}, DEFAULTS, GM_getValue('jcwNewCfg', {}));
-  $('jnSes').value = cfg.session; $('jnYear').value = cfg.year; $('jnSno').value = cfg.snoStart; $('jnLast').value = cfg.lastDate; $('jnOpen').value = cfg.openSub; $('jnFee').value = cfg.subFee; $('jnEve').checked = !!cfg.evening;
+  $('jnSes').value = cfg.session; $('jnYear').value = cfg.year; $('jnSno').value = cfg.snoStart; $('jnLast').value = cfg.lastDate; $('jnOpen').value = cfg.openSub; $('jnFee').value = cfg.subFee; $('jnEve').checked = !!cfg.evening; $('jnFix').value = cfg.feeFix || '';
   const readCfg = () => { const c = { session: sp($('jnSes').value), year: sp($('jnYear').value).replace(/\D/g, '').slice(-2), snoStart: Number($('jnSno').value) || 1, lastDate: sp($('jnLast').value),
-    openSub: Number($('jnOpen').value) || 0, subFee: Number($('jnFee').value) || 60000, evening: $('jnEve').checked }; GM_setValue('jcwNewCfg', c); return c; };
+    openSub: Number($('jnOpen').value) || 0, subFee: Number($('jnFee').value) || 60000, evening: $('jnEve').checked, feeFix: $('jnFix').value }; GM_setValue('jcwNewCfg', c); return c; };
   $('jnMin').onclick = () => box.classList.toggle('min');
   let LIST = null, busy = false;
   const lock = on => { busy = on; ['jnList', 'jnGo', 'jnResume'].forEach(i => { $(i).disabled = on || (i === 'jnGo' && !LIST); }); };
