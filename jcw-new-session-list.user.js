@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.6
+// @version      1.7
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
@@ -124,14 +124,20 @@
       if (!o.late && pool[o.quota] < P.seats) { pool[o.quota]++; o.inPool = true; }
       else if (o.pk !== 'PM') notes.push([o.s['Student Name'], o.s['Father Name'], o.s['Program'], o.quota + ': outside the ' + P.seats + ' shared seats (' + P.programs.join(', ') + '). Check her quota.']);
     });
+    /* the 85 Open Quota subsidized seats: by Aggregate (older first on equal Aggregate); a late student keeps her merit place only if she
+       paid the subsidized fee (the fee decides), otherwise the seat goes to the next on-time student */
+    PM.filter(o => o.quota === OPEN && o.agg !== null).sort((a, b) => (b.agg - a.agg) || ((a.dob || 99999999) - (b.dob || 99999999)) || ((a.fee || 99999999) - (b.fee || 99999999)))
+      .forEach(o => { if ((used.open || 0) < cfg.openSub && (!o.late || o.subFee)) { used.open = (used.open || 0) + 1; o.openSeat = true; used.cut = o.agg; } });
     PM.forEach(o => {
       let k = 'PMM';
       if (o.quota === UOP) k = 'PMS';
       else if (POOLS[o.quota]) k = o.inPool ? 'PMS' : 'PMM';
       else if (SUB_SEATS[o.quota] !== undefined) { used[o.quota] = used[o.quota] || 0; if (!o.late && used[o.quota] < SUB_SEATS[o.quota]) { used[o.quota]++; k = 'PMS'; } }
       else if (o.quota === OPEN) {
-        used[OPEN] = used[OPEN] || 0;
-        if (!o.late && o.agg !== null && used[OPEN] < cfg.openSub) { used[OPEN]++; k = 'PMS'; used.cut = o.agg; }   // used.cut = Open Quota subsidized stopping merit
+        if (o.openSeat) {
+          k = 'PMS';
+          if (o.late) notes.push([o.s['Student Name'], o.s['Father Name'], 'Pre-Medical (S)', 'Paid on ' + sp(o.s['Fee Paid Date']) + ', after the last date of admission (' + cfg.lastDate + '), but paid the subsidized fee: kept on her Open Quota merit seat (Aggregate ' + o.agg + ').']);
+        }
       }
       // the fee she paid decides (every quota): subsidized fee -> (S); in (S) but paid the self-finance fee -> stays, flagged
       const rs = n => 'Rs ' + n.toLocaleString('en-US');
