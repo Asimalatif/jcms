@@ -43,6 +43,7 @@ Working days <input id="nd" type="number" min="1" max="14" value="7" style="widt
 
 <section class="card"><h2>3 · Results</h2>
 <div class="k" id="kpi"></div>
+<h2 style="margin-top:14px">Where the server spends the time (average per save)</h2><div id="tmx" class="sub">Run the test first.</div>
 <h2 style="margin-top:14px">Risks found</h2><div id="risk" class="sub">Run the test first.</div>
 <h2 style="margin-top:14px">Each period (burst of saves)</h2>
 <div style="max-height:360px;overflow:auto"><table><thead><tr><th>Day</th><th>Period</th><th class="n">Saves</th><th class="n">Failed</th><th class="n">Average s</th><th class="n">Slowest s</th><th class="n">Burst took s</th></tr></thead><tbody id="per"></tbody></table></div>
@@ -83,6 +84,9 @@ function paint(PER){
     ['95% within', (pct(ms, 95) / 1000).toFixed(1) + ' s'], ['Slowest', (Math.max(0, ...ms) / 1000).toFixed(1) + ' s'], ['Read back wrong', chkBad.length + ' of ' + chk.length]]
     .map(([a, b]) => `<div><small>${a}</small><b class="${/Failed|wrong/.test(a) && parseInt(b) ? 'bad' : ''}">${b}</b></div>`).join('');
   $('#per').innerHTML = PER.map(p => `<tr><td>${p.day}</td><td>${p.per}</td><td class="n">${p.n}</td><td class="n ${p.f ? 'bad' : ''}">${p.f}</td><td class="n">${p.avg}</td><td class="n ${p.max > 30 ? 'warn' : ''}">${p.max}</td><td class="n">${p.dur}</td></tr>`).join('');
+  const T = ALL.filter(x => x.tm), av = k => T.length ? (T.reduce((a, x) => a + (Number(x.tm[k]) || 0), 0) / T.length / 1000).toFixed(2) : '-';
+  $('#tmx').innerHTML = T.length ? '<table><tr><th>Waiting for the lock</th><th>Reading the sheet</th><th>Period data</th><th>Writing + checking marks</th><th>History + flush</th><th>After the lock (index, lectures)</th><th>Before (login, new sheet)</th><th>Total in server</th></tr><tr>' +
+    ['wait', 'read', 'pd', 'write', 'flush', 'after'].map(k => '<td class="n">' + av(k) + ' s</td>').join('') + '<td class="n">' + (T.length ? (T.reduce((a, x) => a + (Number(x.tm.allowed) || 0) + (Number(x.tm.create) || 0), 0) / T.length / 1000).toFixed(2) : '-') + ' s</td><td class="n"><b>' + av('total') + ' s</b></td></tr></table><div class="sub">From ' + T.length + ' answered saves. Everything except “waiting” and “after” happens inside the lock, one teacher at a time.</div>' : 'No answered saves with timings yet.';
   const E = {}; bad.forEach(x => { const k = String(x.err).replace(/\d+/g, '#').slice(0, 140); (E[k] = E[k] || []).push(x); });
   $('#errs').innerHTML = Object.keys(E).length ? '<table><tr><th>Error</th><th class="n">Times</th><th>Example</th></tr>' + Object.entries(E).sort((a, b) => b[1].length - a[1].length).map(([k, L]) => `<tr><td class="bad">${esc(k)}</td><td class="n">${L.length}</td><td>${esc(L[0].day + ' P' + L[0].per + ' ' + L[0].cls + ' ' + L[0].sub)}</td></tr>`).join('') + '</table>' : 'None.';
   const R = [], to = Number($('#to').value) * 1000;
@@ -127,7 +131,7 @@ $('#bRun').onclick = async () => {
           x.n = roster[sheet].length;
           const id = 'lt' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
           const sv = await api({ action:'save', test:true, records:[{ id, sheet, day:step.D.d, period:step.per, marks, ts:Date.now() }] }, to);
-          x.ms = sv._ms; x.sms = sv.ms;
+          x.ms = sv._ms; x.sms = sv.ms; x.tm = sv.tm || null;
           if(!sv.ok) throw new Error(sv.error);
           if((sv.failed || []).length) throw new Error('not saved: ' + JSON.stringify(sv.failed[0]).slice(0, 200));
           x.ok = true;
