@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JCMS · Portal scripts</title>
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--br:#6B3423;--bg:#FBF3F1;--line:#E7B7AE;--soft:#FBEDEA;--tx:#2a1a14;--mu:#7c6159}
+*{box-sizing:border-box}body{margin:0;font:15px/1.55 system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:linear-gradient(90deg,#5a2a1b,#8a4a32);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px}
+header img{width:38px;height:38px;border-radius:50%;background:#fff}header h1{font-size:19px;margin:0}header small{display:block;font-size:12.5px;opacity:.85;font-weight:400}
+header a{margin-left:auto;color:#fff;border:1.5px solid #fff;border-radius:999px;padding:5px 12px;text-decoration:none;font-weight:700;font-size:13px}
+main{max-width:980px;margin:0 auto;padding:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin:0 0 14px}
+.card h2{margin:0 0 4px;font-size:17px;color:var(--br)}.ver{font-size:12px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-left:6px;color:var(--br)}
+.tag{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:1px 8px;margin:2px 4px 2px 0}.ro{background:#e8f5e9;color:#1b5e20}.rw{background:#fdecea;color:#9b1c1c}.app{background:#eef2ff;color:#14213D}
+.btn{display:inline-block;background:var(--br);color:#fff;text-decoration:none;font-weight:700;border-radius:10px;padding:8px 14px;margin:8px 8px 0 0}.btn.s{background:var(--soft);color:var(--br);border:1px solid var(--line)}
+ul{margin:6px 0 0 18px;padding:0}li{margin:3px 0}ol{margin:6px 0 0 20px;padding:0}code{background:var(--soft);border-radius:5px;padding:0 4px;font-size:13px}
+.note{background:var(--soft);border-left:4px solid var(--br);border-radius:8px;padding:8px 12px;margin:10px 0 0}
+</style></head><body>
+<header><img src="jcw-logo.png" alt=""><h1>Portal scripts (Tampermonkey)<small>JCMS · Jinnah College Management System · install them again on any laptop</small></h1><a href="./">Open the app</a></header>
+<main>
+<section class="card"><h2>New laptop: set everything up again</h2>
+<ol>
+<li>Install Google Chrome (or Edge) and the <b>Tampermonkey</b> extension from the Chrome Web Store.</li>
+<li>Open <code>chrome://extensions</code>, switch on <b>Developer mode</b>, open Tampermonkey's <b>Details</b> and turn on <b>Allow user scripts</b> (new Chrome versions need it).</li>
+<li>Press <b>Install</b> below on every script you use; Tampermonkey shows its page: press <b>Install</b> again.</li>
+<li>Log in to the UOP portal and open <b>Student → Students</b>: the panels appear.</li>
+<li>Portal Sync, New Session List and Enrollment Manager ask once for the <b>sync key</b> (app → College → UOP portal sync → Get sync key). When Tampermonkey asks to connect to script.google.com, press <b>Always allow</b>.</li>
+</ol>
+<div class="note">The sync key is not stored in these files (the code is public on GitHub). The same files and these notes are in GitHub: <code>Asimalatif/jcms</code> → <code>PORTAL-SCRIPTS.md</code>. To update a script on a laptop, press Install again.</div>
+</section>
+
+<section class="card"><h2>1. JCW Portal Sync <span class="ver">v1.12</span></h2>
+<span class="tag ro">Read only on the portal</span><span class="tag app">Sends to JCMS</span>
+<p>Reads every Jinnah College student from the portal and fills the <b>empty cells</b> of Transform-ALL-COLLEGE-STRENGTH; lists students who left for Left Students.</p>
+<ul><li><b>Quick sync</b> (1–2 min): the list, plus fee challans and details of new enrolled students. <b>Auto quick sync every 20 min</b> while the tab is open; the app's “Sync with the portal now” starts it by itself.</li>
+<li><b>Full sync</b> (30–60 min, resumes after a logout): DOB, contact, email, photo, HQ, quota, matric board / year / roll no / marks, challans, FEE PAID DATE, First Challan Date, 1st and 2nd year subjects.</li>
+<li><b>Details of students who left</b>; <b>Move / Add N to Left Students</b> only when you press it.</li>
+<li>v1.12 adds First Challan Date (finds migrated-in students). If a laptop still has 1.11, install again.</li></ul>
+<a class="btn" href="jcw-portal-sync.user.js">Install</a><a class="btn s" href="https://github.com/Asimalatif/jcms/blob/main/jcw-portal-sync.user.js" target="_blank" rel="noopener">See the code</a></section>
+
+<section class="card"><h2>2. JCW New Session List <span class="ver">v2.1</span></h2>
+<span class="tag ro">Read only on the portal</span><span class="tag app">Reads Seat settings from JCMS</span>
+<p>Makes the next session's 1st Year list as Excel in the exact Transform columns: F.A, Pre-Engineering, FCS, Pre-Medical (S), (M), (E), “Seats &amp; merit” and “Check these”, by every admission rule (manual sections 20A and 20C).</p>
+<ul><li>Panel: session, Enroll# year, first S.No, last date, seats (<b>From the app</b>), subsidized fee, Evening, fee date corrections, batch.</li>
+<li>1. Read the list → 2. Read details &amp; make the Excel file (20–40 min for 1,200 students; Resume after a logout).</li></ul>
+<a class="btn" href="jcw-new-session-list.user.js">Install</a><a class="btn s" href="https://github.com/Asimalatif/jcms/blob/main/jcw-new-session-list.user.js" target="_blank" rel="noopener">See the code</a></section>
+
+<section class="card"><h2>3. UOP VC – Enrollment Manager <span class="ver">v3.7</span></h2>
+<span class="tag rw">Changes the portal</span><span class="tag app">Wrong values from JCMS</span>
+<p>Sets Enrollment#, Reg# (= Enrollment#), Program, Class, Section and matric / O-Level marks on each student's portal edit page.</p>
+<ul><li><b>⬇ Load wrong values from JCW app</b> (Admissions → Wrong on portal) or a CSV (PORTAL ID, Enroll#, Program, Class, Section, Student Name, Father Name).</li>
+<li>Always <b>🔍 Check only</b> first, then <b>▶ Update</b>. It never saves when the student's name on the page is different; ⚠ rows are unticked; “✕ never change this student”; ⬇ Report (CSV).</li></ul>
+<a class="btn" href="uop-enrollment-manager.user.js">Install</a><a class="btn s" href="https://github.com/Asimalatif/jcms/blob/main/uop-enrollment-manager.user.js" target="_blank" rel="noopener">See the code</a></section>
+
+<section class="card"><h2>4. UOP Lookup Bridge <span class="ver">v2.1</span></h2>
+<span class="tag ro">Read only on the portal</span><span class="tag app">Admission Quota Manager</span>
+<p>Works only in the window opened by the Admission Quota Manager's <b>Connect portal</b> button: loads the student list and answers its searches (name, father, Enrollment#, Reg#) and detail requests (DOB, email, contact, address, Hafiz, photo, quota, matric marks, board, subjects, fee challans).</p>
+<ul><li>v2.1 fixes the empty quota of v2.0 (“sp is not defined”).</li></ul>
+<a class="btn" href="uop-lookup-bridge.user.js">Install</a><a class="btn s" href="https://github.com/Asimalatif/jcms/blob/main/uop-lookup-bridge.user.js" target="_blank" rel="noopener">See the code</a></section>
+
+<section class="card"><h2>5. UOP Status Check <span class="ver">v1.0</span></h2>
+<span class="tag ro">Read only on the portal</span><span class="tag app">Admission Quota Manager</span>
+<p>Waits silently in every portal tab. When the Admission Quota Manager presses <b>Check portal status</b>, it reads the Cancelled, Migrated, Disenrolled and Enrolled lists of Jinnah College and sends them back (re-read when older than 5 minutes).</p>
+<a class="btn" href="uop-status-check.user.js">Install</a><a class="btn s" href="https://github.com/Asimalatif/jcms/blob/main/uop-status-check.user.js" target="_blank" rel="noopener">See the code</a></section>
+</main></body></html>
