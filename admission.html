@@ -2046,7 +2046,9 @@ function meritLists(){
       const noSeats = q.seats === '' || q.seats == null;
       const pl = q.pooled ? s.pools.find(x => qk(x.quota) === qk(q.name)) : null;
       const home = pl ? pl.members.map(m => m.key).filter(k => used.has(k)) : [p.key];
-      if(pl && home[0] !== p.key) return;
+      // v8.47 a shared pool is built once, under its subsidized program (Pre-Medical (S)) when it has one, so its refund list / shifting letter work
+      const anc = pl ? (home.find(k => (prog(k) || {}).fee === 'sub') || home[0]) : p.key;
+      if(pl && anc !== p.key) return;
       const qq = qk(q.name), emp = /\bu\.?\s*o\.?\s*p\b.*employ|universit\w*\s*employ/i.test(q.name);   // UoP Employee Quota: every employee's daughter is admitted, always on a subsidized seat
       const keys = home.concat(sib);
       let seats = noSeats ? 0 : Number(pl ? pl.seats : q.seats) || 0;
@@ -2077,7 +2079,8 @@ function meritLists(){
         const rank = i + 1, here = home.includes(o.key), should = rank <= seats;
         let state = here && should ? 'ok' : '', why = '';
         if(sib.length){
-          if(here && !should){ state = 'bad'; why = 'Below the last seat of ' + pr.label + ': should be in ' + (prog(sib[0]) || {}).label; }
+          if(here && !should && o.key !== p.key){ state = 'surplus'; why = 'Surplus: over the ' + seats + ' shared seats of ' + q.name; }
+          else if(here && !should){ state = 'bad'; why = 'Below the last seat of ' + pr.label + ': should be in ' + (prog(sib[0]) || {}).label; }
           else if(!here && should && !emp && empty > 0){ state = 'next'; why = 'Next in line: a seat of ' + pr.label + ' is empty'; empty--; }
           else if(!here && should){ state = 'bad'; why = emp ? 'UoP Employee Quota is always subsidized: should be in ' + pr.label : 'Inside the ' + seats + ' seats of ' + pr.label + ': should move up' + (pl ? ' (this quota)' : ''); }
           else if(!here && nextLeft > 0){ state = 'next'; why = 'Next in line for ' + pr.label; nextLeft--; }
@@ -2098,7 +2101,7 @@ function meritLists(){
           if(r.o._a !== t._a || !!r.o._late !== !!t._late || (t._late && r.o._pk !== t._pk)) break;
           if(!r.here && !r.cand && !r.state){ r.state = 'next'; r.why = 'Next in line: same Aggregate (' + (t._a / 100) + ')' + (r.why ? ' · ' + r.why : ''); } } }
       out.push({ key:p.key, label:pl ? 'Shared pool: ' + home.map(k => (prog(k) || {}).label || k).join(', ') : pr.label || p.key, fee:fees[p.key] || 0,
-        sibFee:sib.length ? fees[sib[0]] || 0 : 0, sibLabel:sib.map(k => (prog(k) || {}).label).join(', '), quota:q.name, seats, inHome, rows, leftTop, subs:!!sib.length, feeSub:pr.fee === 'sub', noSeats,
+        sibFee:sib.length ? fees[sib[0]] || 0 : 0, sibLabel:sib.map(k => (prog(k) || {}).label).join(', '), quota:q.name, seats, inHome, rows, leftTop, subs:!!sib.length, feeSub:pr.fee === 'sub', subKeys:[p.key].concat(sib), noSeats,
         held:sib.length ? L.slice(0, seats).filter(o => home.includes(o.key)).length : inHome, open, home, emp, group:pl ? 'Shared pools' : pr.label || p.key, qlabel:q.name });
     });
   });
@@ -2320,6 +2323,7 @@ function mlShiftRows(c, all, cand){
     // v8.46 merit set = lowest Aggregate on a seat; HQ helped if her marks alone are below it
     const cut = Math.min(...L.rows.filter(r => r.rank <= L.seats && r.here && r.o._a).map(r => r.o._a));
     L.rows.forEach(r => { const o = r.o; if(!((r.rank <= L.seats && r.here) || (cand && r.cand))) return;
+      if(L.subKeys && !L.subKeys.includes(o.key)) return;   // v8.47 shared pool: only Pre-Medical students (F.A / FCS / Pre-Engineering have one fee)
       const paid = feeOf(o.challan).filter(x => x.paid && x.amount >= sub * .8).reduce((t, x) => t + x.amount, 0); if(paid <= sub * 1.05) return;
       const m = Number(String(o.metric || '').replace(/,/g, '')), t = Number(String(o.total || '').replace(/,/g, '')), hqHelp = /^y/i.test(o.hq || '') && t > 0 && isFinite(cut) && Math.round(m * 10000 / t) < cut;
       const k = nroll(o.roll) || o.name; if(seen.has(k)) return; seen.add(k); out.push({ o, q:L.quota, cand:!!r.cand && !(r.rank <= L.seats && r.here), rank:r.rank, sub, paid, hqHelp, cut }); }); });
