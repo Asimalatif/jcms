@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCW New Session List (Transform)
 // @namespace    jcw-attendance
-// @version      1.5
+// @version      1.6
 // @description  Reads the 1st Year students of the new session from the UOP portal (read-only) and makes an Excel file in the exact Transform-ALL-COLLEGE-STRENGTH columns: one sheet each for F.A, Pre-Engineering, FCS, Pre-Medical (S) subsidized, Pre-Medical (M) and Pre-Medical (E), with Aggregate, MeritNo, Age-wise, Enroll#, section, PCS and room by the JCW merit rules.
 // @match        https://portal.uop.edu.pk/Student/Students*
 // @match        https://portal.uop.edu.pk/student/students*
@@ -102,12 +102,12 @@
       let feeTotal = 0, feePaid = 0;
       String(s['Challan Details'] || '').split(',').forEach(c => { const m = c.trim().match(/^([PU])-([\d.]+)/i); if (!m || +m[2] <= 3000) return; feeTotal += +m[2]; if (/p/i.test(m[1])) feePaid += +m[2]; });
       const quota = quotaOf(s['Category']), emp = quota === UOP;   // UoP employees: always subsidized, they pay no fee (the portal's challans for them mean nothing)
-      const o = { s, pk: programKey(s['Program']), quota, emp, hq, obt, tot, agg, dob, fee, late: !emp && !!(last && fee && fee > last),
+      const o = { s, pk: programKey(s['Program']), quota, emp, hq, obt, tot, agg, dob, fee, late: !emp && !!(last && fee && fee > last), flag: '', why: '',
         feeTotal, subFee: !emp && feePaid > 0 && feeTotal <= Number(cfg.subFee || 60000) };
+      if (emp && agg !== null && agg < 50) { o.flag = 'red'; o.why = 'UoP Employee Quota needs at least 50% marks: her Aggregate is ' + agg + '. Kept on the subsidized seat; check her admission.'; }
       if (agg === null) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No matric marks on the portal: Aggregate and merit left empty, put at the end of the list.']);
       if (!dob) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No date of birth on the portal (age decides equal Aggregates).']);
       if (!fee && !emp) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'No paid admission fee (above Rs 3,000) found on the portal.']);
-      if (emp && agg !== null && agg < 50) notes.push([s['Student Name'], s['Father Name'], s['Program'], 'UoP Employee Quota needs at least 50% marks: her Aggregate is ' + agg + '.']);
       return o;
     }).filter(o => { if (!o.pk) { notes.push([o.s['Student Name'], o.s['Father Name'], o.s['Program'], 'Program not known: left out.']); return false; } return true; });
     /* merit order: on time first, higher Aggregate, then older (earlier DOB), then earlier fee date */
@@ -170,7 +170,7 @@
         seats.push([sh.name, q, byQ[q].length, lim == null ? '-' : lim, G.length ? G[0].agg : '', G.length ? G[G.length - 1].agg : '']);   // G is by Aggregate: first = highest
       });
       marks[sh.name] = [];
-      L.forEach((o, i) => { if (o.flag) { marks[sh.name].push([i, o.flag === 'orange' ? 'F8CBAD' : 'FFFF00']); notes.push([o.s['Student Name'], o.s['Father Name'], sh.name + ' · row ' + (i + 2) + ' · ' + o.quota, o.why]); } });
+      L.forEach((o, i) => { if (o.flag) { marks[sh.name].push([i, o.flag === 'orange' ? 'F8CBAD' : o.flag === 'red' ? 'FF9999' : 'FFFF00']); notes.push([o.s['Student Name'], o.s['Father Name'], sh.name + ' · row ' + (i + 2) + ' · ' + o.quota, o.why]); } });
       out[sh.name] = L.map((o, i) => {
         const s = o.s, sec = sh.sections[i % sh.sections.length], roll = 'JCW-F' + cfg.year + '-' + (sh.roll[0] + i);
         let subs = []; for (let k = 1; k <= 7; k++) subs.push(sp(s['sub' + k + ' 1st year']).toUpperCase());
