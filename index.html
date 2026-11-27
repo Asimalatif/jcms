@@ -3992,7 +3992,7 @@ function adminBody(){
       .sort((a, b) => (b.rows.length - b.done) - (a.rows.length - a.done) || a.name.localeCompare(b.name));
     return `${sun ? '' : `<div class="seg2"><button type="button" data-xpend="1" class="${aF.pend ? 'on' : ''}">Not marked (${pendT.length})</button><button type="button" data-xpend="0" class="${aF.pend ? '' : 'on'}">All teachers (${T.length})</button></div>`}
       <section class="card">${list.slice(0, CAP).map(t => `<div class="li"><span class="av">${esc(initials(t.name))}</span><span class="tx"><b>${esc(t.name)}</b><small>${esc(t.dept || 'No department')} · ${t.done}/${t.rows.length} marked today</small>
-        <span class="tchips">${t.rows.slice().sort((a, b) => a.today - b.today).map(r => `<span class="tchip ${r.today ? '' : 'no'}" title="${esc(r.last ? 'Last marked on day ' + r.last : 'Not marked this month')}">${r.today ? '✓ ' : ''}${esc(r.cls)} · ${esc(shortSub(r.sub))}</span>`).join('')}</span></span>
+        <span class="tchips">${t.rows.slice().sort((a, b) => a.today - b.today).map(r => `<span class="tchip ${r.today ? '' : 'no'}" title="${esc(r.wait ? 'Marked: still in the inbox, reaches the sheet within a minute or two' : r.last ? 'Last marked on day ' + r.last : 'Not marked this month')}">${r.today ? (r.wait ? '⏳ ' : '✓ ') : ''}${esc(r.cls)} · ${esc(shortSub(r.sub))}</span>`).join('')}</span></span>
         <span class="pill ${t.done === t.rows.length ? 'good' : 'bad'}">${t.done}/${t.rows.length}</span>${!sun && t.done < t.rows.length ? `<button class="pill good" type="button" data-xrem="${esc(t.name)}" aria-label="Remind ${esc(t.name)} on WhatsApp">Remind</button>` : ''}</div>`).join('') || `<div class="empty">${aF.pend && !sun ? 'Every teacher has marked attendance today.' : 'No teacher matches.'}</div>`}
       ${list.length > CAP ? `<div class="empty">Showing ${CAP} of ${list.length}. Use search to narrow.</div>` : ''}</section>
       <div class="acts2"><button class="btn" type="button" id="xNmTxt">Share as text</button><button class="btn primary" type="button" id="xNmPdf">${I.share}Not-marked PDF</button></div>`;
@@ -6170,7 +6170,7 @@ async function remindTeacher(name){
   const w = waNum(c); if(!w) return toast('No WhatsApp number for ' + name + '.');
   const T = teachersAgg(ovRows().filter(r => r.sched !== false)).find(t => nkey(t.name) === nkey(name));
   const left = T ? T.rows.filter(r => !r.today).map(r => r.cls + ' ' + titleCase(r.sub)) : [];
-  const msg = 'Assalam-o-Alaikum ' + name + ',\nToday\'s attendance (' + fmtDate(new Date()) + ') is not marked yet' + (left.length ? ' for:\n- ' + left.join('\n- ') : '.') + '\nPlease mark it in JCMS (the JCW app).\n- ' + (teacher || user) + (scope === 'all' ? (isAdmin ? ' (Admin)' : ' (Principal)') : isCP ? ' (Chief Proctor)' : scope === 'dept' ? ' (HOD)' : '');
+  const msg = 'Assalam-o-Alaikum ' + name + ',\nToday\'s attendance (' + fmtDate(new Date()) + ') is not marked yet' + (left.length ? ' for:\n- ' + left.join('\n- ') : '.') + '\nPlease mark it in JCMS (the JCW app). If you already marked it, open JCMS once with internet so your saved marks are sent.\n- ' + (teacher || user) + (scope === 'all' ? (isAdmin ? ' (Admin)' : ' (Principal)') : isCP ? ' (Chief Proctor)' : scope === 'dept' ? ' (HOD)' : '');
   const url = /wa\.me\//.test(w) ? w + '?text=' + encodeURIComponent(msg) : w;
   window.open(url, '_blank', 'noopener');
 }

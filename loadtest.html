@@ -103,11 +103,11 @@ function pvDraw(){
   const L = Object.values(T).map(t => Object.assign(t, { done:t.rows.filter(r => r.today).length })).filter(t => pvMode === 'all' || t.done < t.rows.length)
     .sort((a, b) => (b.rows.length - b.done) - (a.rows.length - a.done) || a.name.localeCompare(b.name));
   const pend = Object.values(T).filter(t => t.done < t.rows.length).length;
-  out.innerHTML = '<b>College → Today · ' + esc(ds) + '</b> · ' + pend + ' of ' + Object.keys(T).length + ' teachers have something not marked (only classes in that day\'s timetable).' +
+  out.innerHTML = '<b>College → Today · ' + esc(ds) + '</b> · ✓ = in the sheet · ⏳ = marked, still in the inbox (counts as marked) · ' + pend + ' of ' + Object.keys(T).length + ' teachers have something not marked (only classes in that day\'s timetable).' +
     '<table><tr><th>Teacher</th><th>Department</th><th>Marked</th><th>Classes (✓ = marked)</th><th>Remind (WhatsApp message)</th></tr>' +
     L.map(t => { const left = t.rows.filter(r => !r.today).map(r => r.cls + ' ' + pvTitle(r.sub));
-      const msg = 'Assalam-o-Alaikum ' + t.name + ',\nToday\'s attendance (' + ds + ') is not marked yet' + (left.length ? ' for:\n- ' + left.join('\n- ') : '.') + '\nPlease mark it in JCMS (the JCW app).';
-      return `<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.dept || '')}</td><td class="n ${t.done === t.rows.length ? 'ok' : 'bad'}">${t.done}/${t.rows.length}</td><td>${t.rows.map(r => (r.today ? '<span class="ok">✓ ' : '<span class="bad">') + esc(r.cls + ' · ' + pvTitle(r.sub)) + '</span>').join('<br>')}</td><td>${left.length ? '<details><summary>Remind</summary><pre style="white-space:pre-wrap;margin:4px 0">' + esc(msg) + '</pre></details>' : ''}</td></tr>`; }).join('') + '</table>' +
+      const msg = 'Assalam-o-Alaikum ' + t.name + ',\nToday\'s attendance (' + ds + ') is not marked yet' + (left.length ? ' for:\n- ' + left.join('\n- ') : '.') + '\nPlease mark it in JCMS (the JCW app). If you already marked it, open JCMS once with internet so your saved marks are sent.';
+      return `<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.dept || '')}</td><td class="n ${t.done === t.rows.length ? 'ok' : 'bad'}">${t.done}/${t.rows.length}</td><td>${t.rows.map(r => (r.today ? (r.wait ? '<span class="warn" title="Marked: still in the inbox, reaches the sheet within a minute or two">⏳ ' : '<span class="ok">✓ ') : '<span class="bad">') + esc(r.cls + ' · ' + pvTitle(r.sub)) + (r.wait ? ' (in the inbox)' : '') + '</span>').join('<br>')}</td><td>${left.length ? '<details><summary>Remind</summary><pre style="white-space:pre-wrap;margin:4px 0">' + esc(msg) + '</pre></details>' : ''}</td></tr>`; }).join('') + '</table>' +
     (L.length ? '' : '<div class="ok">Every teacher has marked this day.</div>');
 }
 $('#bPv').onclick = async () => { $('#pvOut').textContent = 'Reading the copy…'; PV = await api({ action:'overview', test:true, day:Number($('#pvDay').value) || 1 }); pvDraw(); };
