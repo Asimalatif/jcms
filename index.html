@@ -913,49 +913,70 @@ function loadDraft(){
 let pgroups = store.get('pgroups', {}), pglec = store.get('pglec', {});
 const pgKey = () => String(sel.cls + '|' + sel.sub).toUpperCase();
 const pgLecKey = () => sheetName() + '|' + sel.day + '|' + sel.period;
+/** { n, of: {roll: group no.}, list: {1: [rolls], 2: [...]} } of the active students, or null when this class + subject has no groups.
+ *  Stored as { n, of } (v8.58, 2 to 8 groups); the older { G1: [rolls] } means 2 groups (G1 ticked, the rest group 2). */
 function pgDef(d){
-  const act = d ? d.students.filter(s => !s.off) : [], g = pgroups[pgKey()];
-  if(!g) return null;
-  const g1 = new Set(g.G1 || []); return { G1:act.filter(s => g1.has(s.roll)).map(s => s.roll), G2:act.filter(s => !g1.has(s.roll)).map(s => s.roll) };
+  const g = pgroups[pgKey()]; if(!g) return null;
+  const act = d ? d.students.filter(s => !s.off) : [], n = g.n || 2, of = {}, list = {};
+  for(let k = 1; k <= n; k++) list[k] = [];
+  const g1 = g.of ? null : new Set(g.G1 || []);
+  act.forEach(s => { let k = g.of ? Number(g.of[s.roll]) : (g1.has(s.roll) ? 1 : 2); if(!(k >= 1 && k <= n)) k = n; of[s.roll] = k; list[k].push(s.roll); });   // a new student joins the last group
+  return { n, of, list };
 }
-/** the group of the open lecture: '' whole class, 'G1' or 'G2' (chosen, or worked out from the saved marks) */
+/** the group of the open lecture: '' whole class, or 'G1' … 'Gn' (chosen, or worked out from the saved marks) */
 function pgCur(d){
   if(mode !== 'att' || !d) return '';
-  const k = pgLecKey(); if(pglec[k] !== undefined) return pglec[k];
-  const def = pgDef(d); if(!def) return '';
+  const def = pgDef(d), k = pgLecKey();
+  if(pglec[k] !== undefined) return pglec[k] && def && Number(pglec[k].slice(1)) <= def.n ? pglec[k] : '';
+  if(!def) return '';
   const sv = pmOf(sel.day)[sel.period] || {}, marked = Object.keys(sv).filter(r => sv[r]); if(!marked.length) return '';
-  const in1 = marked.every(r => def.G1.includes(r)), in2 = marked.every(r => def.G2.includes(r));
-  return in1 && !in2 ? 'G1' : in2 && !in1 ? 'G2' : '';
+  const gs = new Set(marked.map(r => def.of[r]).filter(Boolean));
+  return gs.size === 1 && marked.length < Object.keys(def.of).length ? 'G' + [...gs][0] : '';
 }
-/** students of the OTHER group in this lecture (treated like disabled students for this lecture only) */
-function pgOut(d){ const g = pgCur(d); if(!g) return new Set(); const def = pgDef(d); return new Set(def ? def[g === 'G1' ? 'G2' : 'G1'] : []); }
+/** students of the OTHER groups in this lecture (treated like disabled students for this lecture only) */
+function pgOut(d){
+  const g = pgCur(d); if(!g) return new Set();
+  const def = pgDef(d), k = Number(g.slice(1)); return new Set(def ? Object.keys(def.of).filter(r => def.of[r] !== k) : []);
+}
 const isOut = (s, O) => s.off || (O && O.has(s.roll));
 function pgBar(d){
   const def = pgDef(d), g = pgCur(d);
+  let o = `<option value="" ${g === '' ? 'selected' : ''}>Whole class</option>`;
+  if(def) for(let k = 1; k <= def.n; k++) o += `<option value="G${k}" ${g === 'G' + k ? 'selected' : ''}>Practical group ${k} (${def.list[k].length})</option>`;
+  o += `<option value="set">${def ? 'Change the groups…' : 'Make practical groups…'}</option>`;
   return `<div class="grpbar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0 6px"><span class="lbl">Lecture for</span>
-    <select id="pgSel" aria-label="Who is in this lecture" style="max-width:220px"><option value="" ${g === '' ? 'selected' : ''}>Whole class</option>${def ? `<option value="G1" ${g === 'G1' ? 'selected' : ''}>Practical group 1 (${def.G1.length})</option><option value="G2" ${g === 'G2' ? 'selected' : ''}>Practical group 2 (${def.G2.length})</option>` : ''}<option value="set">${def ? 'Change the groups…' : 'Make practical groups…'}</option></select>
-    ${g ? `<small style="color:#7c6159">Group ${g.slice(1)} only: the other group is free and is not counted for this lecture.</small>` : ''}</div>`;
+    <select id="pgSel" aria-label="Who is in this lecture" style="max-width:230px">${o}</select>
+    ${g ? `<small style="color:#7c6159">Group ${g.slice(1)} only: the other groups are free and are not counted for this lecture.</small>` : ''}</div>`;
 }
 function openGroups(){
   const d = data[sheetName()], dlg = $('#dlg'); if(!d) return toast('This sheet is not on the phone yet');
-  const act = d.students.filter(s => !s.off), g = pgroups[pgKey()], cur = new Set(g ? g.G1 : act.slice(0, Math.ceil(act.length / 2)).map(s => s.roll));
-  $('#dlgBody').innerHTML = `<h2>Practical groups · ${esc(sel.cls)} ${esc(titleCase(sel.sub))}</h2>
-    <div class="sub">Tick the students of <b>Group 1</b>; everyone else is <b>Group 2</b>. The groups stay for this class and subject in every month. Then pick “Practical group 1 / 2” above the list for a lecture.</div>
-    <div class="acts" style="flex-wrap:wrap"><button class="btn small" id="pgHalf">First half = Group 1</button><button class="btn small" id="pgOdd">Odd numbers = Group 1</button><button class="btn small" id="pgNone">Untick all</button></div>
-    <div id="pgList" style="max-height:50vh;overflow:auto;margin:6px 0">${act.map((s, i) => `<label style="display:flex;gap:8px;align-items:center;padding:4px 2px;border-bottom:1px solid #eee"><input type="checkbox" data-pg="${esc(s.roll)}" ${cur.has(s.roll) ? 'checked' : ''}> <span>${i + 1}. ${esc(s.name)} <small style="color:#7c6159">${esc(s.roll)}</small></span></label>`).join('')}</div>
-    <div class="sub" id="pgCnt"></div>
-    <div class="acts"><button class="btn small fill grow" id="pgSave">Save groups</button>${g ? '<button class="btn small danger grow" id="pgDel">Remove groups</button>' : ''}<button class="btn small grow" id="pgCancel">Cancel</button></div>`;
-  const boxes = () => [...document.querySelectorAll('#pgList input[data-pg]')];
-  const cnt = () => { const n = boxes().filter(b => b.checked).length; $('#pgCnt').textContent = 'Group 1: ' + n + ' · Group 2: ' + (act.length - n); };
-  $('#pgList').onchange = cnt; cnt();
-  $('#pgHalf').onclick = () => { boxes().forEach((b, i) => b.checked = i < Math.ceil(act.length / 2)); cnt(); };
-  $('#pgOdd').onclick = () => { boxes().forEach((b, i) => b.checked = i % 2 === 0); cnt(); };
-  $('#pgNone').onclick = () => { boxes().forEach(b => b.checked = false); cnt(); };
-  $('#pgCancel').onclick = () => { dlg.close(); renderMain(); };
-  $('#pgSave').onclick = () => { const G1 = boxes().filter(b => b.checked).map(b => b.dataset.pg); if(!G1.length || G1.length === act.length) return toast('Each group needs at least one student.');
-    pgroups[pgKey()] = { G1, at:Date.now() }; store.set('pgroups', pgroups); dlg.close(); renderMain(); toast('Groups saved: ' + G1.length + ' + ' + (act.length - G1.length) + '. Pick the group above the list for each practical lecture.'); };
-  if($('#pgDel')) $('#pgDel').onclick = () => { if(!confirm('Remove the practical groups of this class and subject?')) return; delete pgroups[pgKey()]; store.set('pgroups', pgroups); dlg.close(); renderMain(); };
-  dlg.showModal();
+  const act = d.students.filter(s => !s.off), old = pgDef(d);
+  let n = old ? old.n : 2; const of = {};
+  act.forEach((s, i) => { of[s.roll] = old ? old.of[s.roll] : (i < Math.ceil(act.length / 2) ? 1 : 2); });
+  const draw = () => {
+    const cnt = {}; for(let k = 1; k <= n; k++) cnt[k] = 0; act.forEach(s => { if(of[s.roll] > n) of[s.roll] = n; cnt[of[s.roll]]++; });
+    $('#dlgBody').innerHTML = `<h2>Practical groups · ${esc(sel.cls)} ${esc(titleCase(sel.sub))}</h2>
+      <div class="sub">Choose how many groups, then the group of each student. The groups stay for this class and subject in every month. Then pick “Practical group …” above the list for a lecture.</div>
+      <div class="acts" style="flex-wrap:wrap;align-items:center">Groups: ${[2, 3, 4, 5, 6, 7, 8].map(k => `<button class="btn small ${k === n ? 'fill' : ''}" data-pgn="${k}">${k}</button>`).join('')}</div>
+      <div class="acts" style="flex-wrap:wrap"><button class="btn small" id="pgSeq">In order: equal blocks</button><button class="btn small" id="pgRR">Take turns: 1, 2, 3, 1, 2, 3 …</button></div>
+      <div class="sub">${Object.keys(cnt).map(k => 'Group ' + k + ': <b>' + cnt[k] + '</b>').join(' · ')}</div>
+      <div id="pgList" style="max-height:48vh;overflow:auto;margin:6px 0">${act.map((s, i) => `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:4px 2px;border-bottom:1px solid #eee"><span>${i + 1}. ${esc(s.name)} <small style="color:#7c6159">${esc(s.roll)}</small></span>
+        <span style="display:flex;gap:3px">${Array.from({ length:n }, (_, k) => `<button class="btn small ${of[s.roll] === k + 1 ? 'fill' : ''}" style="min-width:34px;padding:4px 6px" data-pgs="${esc(s.roll)}" data-k="${k + 1}">${k + 1}</button>`).join('')}</span></div>`).join('')}</div>
+      <div class="acts"><button class="btn small fill grow" id="pgSave">Save groups</button>${old ? '<button class="btn small danger grow" id="pgDel">Remove groups</button>' : ''}<button class="btn small grow" id="pgCancel">Cancel</button></div>`;
+    const top = $('#pgList') ? $('#pgList').scrollTop : 0;
+    document.querySelectorAll('[data-pgn]').forEach(b => b.onclick = () => { n = Number(b.dataset.pgn); draw(); });
+    $('#pgSeq').onclick = () => { const z = Math.ceil(act.length / n); act.forEach((s, i) => of[s.roll] = Math.min(n, Math.floor(i / z) + 1)); draw(); };
+    $('#pgRR').onclick = () => { act.forEach((s, i) => of[s.roll] = i % n + 1); draw(); };
+    document.querySelectorAll('[data-pgs]').forEach(b => b.onclick = () => { const st = $('#pgList').scrollTop; of[b.dataset.pgs] = Number(b.dataset.k); draw(); $('#pgList').scrollTop = st; });
+    $('#pgCancel').onclick = () => { dlg.close(); renderMain(); };
+    $('#pgSave').onclick = () => {
+      const empty = Object.keys(cnt).filter(k => !cnt[k]); if(empty.length) return toast('Group ' + empty.join(', ') + ' has no students. Choose fewer groups or move students into it.');
+      pgroups[pgKey()] = { n, of:Object.assign({}, of), at:Date.now() }; store.set('pgroups', pgroups); dlg.close(); renderMain();
+      toast(n + ' groups saved (' + Object.keys(cnt).map(k => cnt[k]).join(' + ') + '). Pick the group above the list for each practical lecture.'); };
+    if($('#pgDel')) $('#pgDel').onclick = () => { if(!confirm('Remove the practical groups of this class and subject?')) return; delete pgroups[pgKey()]; store.set('pgroups', pgroups); dlg.close(); renderMain(); };
+    if($('#pgList')) $('#pgList').scrollTop = top;
+  };
+  draw(); dlg.showModal();
 }
 
 /** Counts only ACTIVE students: disabled students (s.off, changed subject / guest removed) are ignored. */
@@ -1590,12 +1611,12 @@ function mtFillA(){
 }
 /* ---------- main screen ---------- */
 function attBodyHtml(d){
-  const O = pgOut(d), og = pgCur(d) === 'G1' ? 'Group 2' : 'Group 1';
+  const O = pgOut(d), PD = O.size ? pgDef(d) : null, og = r => 'Group ' + (PD && PD.of[r] || '');
   return pgBar(d) + `<div class="allrow"><span class="lbl">Mark all</span><span class="seg">` +
     MARKS.map(v => `<label class="ck ${v.toLowerCase()}">${v}<input type="checkbox" data-all="${v}" aria-label="Mark all ${v}"></label>`).join('') + `</span></div>` +
     '<ul class="list" id="list">' + d.students.map((s, i) => `
     <li class="row ${isOut(s, O) ? 'off' : ''}" data-roll="${esc(s.roll)}"><span class="no">${i + 1}</span>
-      <span class="who"><b>${esc(s.name)}</b><small><span>${esc(s.roll)}</span><span class="pct"></span>${s.off ? offTag(s) : O.has(s.roll) ? '<span class="rtag">' + og + ' · free this lecture</span>' : ''}${tagHtml(s.roll)}</small></span>
+      <span class="who"><b>${esc(s.name)}</b><small><span>${esc(s.roll)}</span><span class="pct"></span>${s.off ? offTag(s) : O.has(s.roll) ? '<span class="rtag">' + og(s.roll) + ' · free this lecture</span>' : ''}${tagHtml(s.roll)}</small></span>
       <span class="seg">${MARKS.map(v => `<button class="${v.toLowerCase()}" data-v="${v}" aria-label="${v}" aria-pressed="false" ${isOut(s, O) ? 'disabled' : ''}>${v}</button>`).join('')}</span></li>`).join('') + '</ul>';
 }
 function mtBodyHtml(d){
@@ -2044,7 +2065,7 @@ document.addEventListener('change', ev => {
   if(id === 'pgSel'){
     if(v === 'set') return openGroups();
     const d = data[sheetName()], O0 = new Set(), def = pgDef(d);
-    if(v && def) def[v === 'G1' ? 'G2' : 'G1'].forEach(r => O0.add(r));
+    if(v && def) Object.keys(def.of).forEach(r => { if(def.of[r] !== Number(v.slice(1))) O0.add(r); });
     pglec[pgLecKey()] = v; store.set('pglec', pglec);
     O0.forEach(r => { if(draft[r]) { delete draft[r]; dirty = true; } });   // the free group is never marked in this lecture
     renderMain(); return;
