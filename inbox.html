@@ -27,7 +27,8 @@ input{font:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 8p
 <div class="tiles" id="tiles"></div>
 <div><button class="p" id="bR">Refresh now</button><label class="sub"><input type="checkbox" id="auto" checked style="min-width:0"> refresh every 20 s</label>
  · Show: <button id="sReal" class="on">Teachers (real sheets)</button><button id="sTest">Load test copy</button>
- · Instant save for teachers: <button id="bOn">Switch ON</button><button id="bOff">Switch OFF</button></div>
+ · Instant save for teachers: <button id="bOn">Switch ON</button><button id="bOff">Switch OFF</button>
+ <button id="bClr" style="display:none">Empty the waiting test saves</button> <a id="book" target="_blank" rel="noopener" style="display:none">Open the inbox workbook ↗</a></div>
 <div class="sub" style="margin-top:6px"><b>How it works:</b> when instant save is ON, a teacher's attendance save goes into the inbox and she gets “saved” at once. Every minute the writer job copies the inbox into the month workbook, one section at a time. <b>Waiting</b> = in the inbox, not yet in the sheet (the teacher already sees her marks in the app). <b>Written</b> = now in the sheet. <b>Problems</b> = could not be written after 3 tries (kept here so nothing is lost; enter them by hand). When it is OFF, saves go straight to the sheets as before and nothing waits here.</div>
 </section>
 <section class="card"><div><button id="tW" class="on">Waiting</button><button id="tD">Written (last 6 hours)</button><button id="tP">Problems</button>
@@ -45,11 +46,13 @@ let D = null, tab = 'W', scope = 'real';
 const ago = (ms, now) => { const s = Math.max(0, Math.round((now - ms) / 1000)); return s < 60 ? s + ' s' : s < 3600 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : Math.floor(s / 3600) + ' h ' + Math.floor(s % 3600 / 60) + ' min'; };
 const tm = ms => new Date(ms).toLocaleTimeString('en-GB');
 const cnt = n => `P ${n.p} · A ${n.a}${n.l ? ' · L ' + n.l : ''}${n.b ? ' · B ' + n.b : ''}${n.blank ? ' · cleared ' + n.blank : ''}`;
-async function load(set){
+async function load(set, extra){
   if(!user){ $('#st').innerHTML = '<span class="bad">Sign in to the app with the admin login first (same browser), then reload.</span>'; return; }
-  const r = await api(Object.assign({ action:'inbox_admin', detail:true }, scope === 'test' ? { test:true } : {}, set ? { set } : {}));
+  const r = await api(Object.assign({ action:'inbox_admin', detail:true }, scope === 'test' ? { test:true } : {}, set ? { set } : {}, extra || {}));
   if(!r.ok){ $('#st').innerHTML = '<span class="bad">' + esc(r.error) + '</span>'; return; }
   D = r; draw();
+  $('#bClr').style.display = scope === 'test' && r.waiting ? '' : 'none';
+  if(r.book){ $('#book').href = r.book; $('#book').style.display = ''; }
 }
 function draw(){
   const r = D, now = r.now, old = r.list.filter(x => now - x.put > 180000).length, run = r.run;
@@ -91,6 +94,7 @@ $('#sReal').onclick = () => { scope = 'real'; $('#sReal').classList.add('on'); $
 $('#sTest').onclick = () => { scope = 'test'; $('#sTest').classList.add('on'); $('#sReal').classList.remove('on'); load(); };
 $('#bOn').onclick = () => { if(confirm('Switch ON instant save for every teacher? Their attendance saves are answered at once and reach the sheets within a minute or two.')) load('on'); };
 $('#bOff').onclick = () => { if(confirm('Switch OFF? Saves go straight to the sheets again (what is already waiting is still written by the job).')) load('off'); };
+$('#bClr').onclick = () => { if(confirm('Drop every waiting LOAD TEST save (they are fake marks for the copy; teachers are not touched)?')) load(null, { clearTest:true }); };
 setInterval(() => { if($('#auto').checked && !document.hidden) load(); }, 20000);
 load();
 </script></body></html>
