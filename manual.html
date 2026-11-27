@@ -125,6 +125,7 @@ section.reading{outline:3px solid #E7B7AE;outline-offset:4px}
     <li><a href="#leavesadm">32. Approved leaves</a></li>
     <li><a href="#ttedit">33. Timetable editor</a></li>
     <li><a href="#faq">34. Problems and answers</a></li>
+    <li><a href="#instant">35. Instant save, monitor, load test</a></li>
   </ol>
 </nav>
 <main id="manual">
@@ -760,6 +761,36 @@ DUPLICATE is printed small and centred under the title “PROVISIONAL CUM CHARAC
 <li>Download Excel; Clear filters.</li></ul>
 </section>
 
+<section id="instant"><h2><span class="n">35</span>Instant save, the monitor and the load test <span class="who">Admin</span></h2>
+<p class="lead">Instant save stops teachers waiting at the bell: her attendance save goes into a small inbox and she gets “saved” in 1–3 seconds; every minute the server writes the inbox into the month workbook.</p>
+<h3>For teachers (when instant save is ON)</h3>
+<ul>
+<li>After Save the message says <i>“Attendance 27 Nov · lecture 2 saved (reaches the sheet within a minute or two) (P 38, A 3)”</i>. Nothing else changes: she sees her marks at once and can correct them as before.</li>
+<li>If her phone has no internet, the marks wait on the phone (status chip yellow) and are sent every 30 s, when internet returns, when she opens the app, or with <b>Sync now</b>. Closing the app is safe. Never use the app in an <b>Incognito</b> tab, and never clear the browser while something is waiting.</li>
+<li>Monthly test marks and day notes are always saved straight into the sheet.</li>
+</ul>
+<h3>College → Today</h3>
+<ul><li>✓ = in the sheet · <b>⏳ = marked, still in the inbox</b> (counts as marked) · red = not marked. <b>Remind</b> sends: “…not marked yet… If you already marked it, open JCMS once with internet so your saved marks are sent.”</li>
+<li>Daily routine: after the last period, College → Today → <b>Not marked</b> → Remind. Weekly: Marked-Missed Entries → <i>Only unmarked rows</i>.</li></ul>
+<h3>Instant save monitor (Admin home → Instant save monitor)</h3>
+<table><tr><th>Part</th><th>What it shows / does</th></tr>
+<tr><td>Status</td><td>Instant save for teachers ON / OFF · writer job set up · writing now · last update. Refreshes every 20 s.</td></tr>
+<tr><td>Tiles</td><td>Waiting in the inbox · Waiting more than 3 min (red) · Oldest waiting · Written (last 6 h) · Problems · Last writer run (sections, saves, seconds, errors).</td></tr>
+<tr><td>Switch ON / OFF</td><td>For every teacher. OFF = saves go straight to the sheets as before; saves already waiting are still written.</td></tr>
+<tr><td>Teachers / Load test copy</td><td>Real saves or the test copy's saves. <b>Empty the waiting test saves</b> drops fake test marks only.</td></tr>
+<tr><td>Waiting</td><td>Every save not yet in the sheet: teacher, section · subject, month, day, lecture, marks, saved at, how long it waits, tries / problem.</td></tr>
+<tr><td>Written (last 6 hours)</td><td>The last 300 saves written: written at, teacher, section, day, lecture, marks, how long they waited.</td></tr>
+<tr><td>Problems</td><td>Saves that could not be written after 3 tries (also in the sheet “Inbox problems” of the inbox workbook). Enter them by hand.</td></tr>
+<tr><td>Open the inbox workbook</td><td>“JCMS Attendance Inbox (do not edit)”: one row per save. Do not edit it.</td></tr></table>
+<div class="note"><b>Healthy:</b> Problems 0, nothing waits more than about 10 minutes. A real period (about 44 saves) is written in 4–5 minutes. <b>If not:</b> press Switch OFF and tell the admin / developer.</div>
+<h3>Load test (Admin home → Load test (test copy))</h3>
+<ol class="steps"><li>Make a copy of the month workbook (File → Make a copy), paste its link in <b>1 · The copy</b> → Use this copy.</li>
+<li><b>2 · What to simulate</b>: first day, working days, teachers saving at the same moment (20 busy, 40 worst), present / absent %, check %, time-out → Start the test.</li>
+<li><b>3 · Results</b>: failed, average, slowest, read back wrong, where the server spends the time, each period, errors, CSV.</li>
+<li><b>4 · Preview</b>: type a day → <b>Show the day</b> (press it again after changing the day): Not marked / All teachers / Month: Marked-Missed, made from the copy.</li>
+<li>Finish: <b>Switch test off</b>, empty the waiting test saves, delete the copy.</li></ol>
+<p class="sub">November 2026 results: normal save with 20 teachers at once: average 26–30 s, some timed out (marks stayed on the phones). With the inbox: 215 saves, 0 failed, average 3.0 s, slowest 6.3 s; all 797 test saves in the inbox were written, 0 lost.</p>
+</section>
 <section id="faq"><h2><span class="n">34</span>Problems and answers</h2>
 <table><tr><th>Problem</th><th>What to do</th></tr>
 <tr><td>Letters too small</td><td>Status chip → Text size → Large or Extra large.</td></tr>
