@@ -906,10 +906,62 @@ function loadDraft(){
   draft = {}; dirty = false; const d = data[sheetName()]; if(!d) return;
   Object.assign(draft, pmOf(sel.day)[sel.period] || {});
 }
+/* ---------- v8.57 practical groups: half the class in a lecture, the other half free ----------
+   Groups belong to a class + subject (all months): G1 = the ticked students, G2 = every other active student.
+   The group of a lecture (whole class / G1 / G2) is kept per sheet, day and lecture; students of the other group
+   are left out of that lecture (not marked, not counted as held for them). Kept on this phone. */
+let pgroups = store.get('pgroups', {}), pglec = store.get('pglec', {});
+const pgKey = () => String(sel.cls + '|' + sel.sub).toUpperCase();
+const pgLecKey = () => sheetName() + '|' + sel.day + '|' + sel.period;
+function pgDef(d){
+  const act = d ? d.students.filter(s => !s.off) : [], g = pgroups[pgKey()];
+  if(!g) return null;
+  const g1 = new Set(g.G1 || []); return { G1:act.filter(s => g1.has(s.roll)).map(s => s.roll), G2:act.filter(s => !g1.has(s.roll)).map(s => s.roll) };
+}
+/** the group of the open lecture: '' whole class, 'G1' or 'G2' (chosen, or worked out from the saved marks) */
+function pgCur(d){
+  if(mode !== 'att' || !d) return '';
+  const k = pgLecKey(); if(pglec[k] !== undefined) return pglec[k];
+  const def = pgDef(d); if(!def) return '';
+  const sv = pmOf(sel.day)[sel.period] || {}, marked = Object.keys(sv).filter(r => sv[r]); if(!marked.length) return '';
+  const in1 = marked.every(r => def.G1.includes(r)), in2 = marked.every(r => def.G2.includes(r));
+  return in1 && !in2 ? 'G1' : in2 && !in1 ? 'G2' : '';
+}
+/** students of the OTHER group in this lecture (treated like disabled students for this lecture only) */
+function pgOut(d){ const g = pgCur(d); if(!g) return new Set(); const def = pgDef(d); return new Set(def ? def[g === 'G1' ? 'G2' : 'G1'] : []); }
+const isOut = (s, O) => s.off || (O && O.has(s.roll));
+function pgBar(d){
+  const def = pgDef(d), g = pgCur(d);
+  return `<div class="grpbar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0 6px"><span class="lbl">Lecture for</span>
+    <select id="pgSel" aria-label="Who is in this lecture" style="max-width:220px"><option value="" ${g === '' ? 'selected' : ''}>Whole class</option>${def ? `<option value="G1" ${g === 'G1' ? 'selected' : ''}>Practical group 1 (${def.G1.length})</option><option value="G2" ${g === 'G2' ? 'selected' : ''}>Practical group 2 (${def.G2.length})</option>` : ''}<option value="set">${def ? 'Change the groups…' : 'Make practical groups…'}</option></select>
+    ${g ? `<small style="color:#7c6159">Group ${g.slice(1)} only: the other group is free and is not counted for this lecture.</small>` : ''}</div>`;
+}
+function openGroups(){
+  const d = data[sheetName()], dlg = $('#dlg'); if(!d) return toast('This sheet is not on the phone yet');
+  const act = d.students.filter(s => !s.off), g = pgroups[pgKey()], cur = new Set(g ? g.G1 : act.slice(0, Math.ceil(act.length / 2)).map(s => s.roll));
+  $('#dlgBody').innerHTML = `<h2>Practical groups · ${esc(sel.cls)} ${esc(titleCase(sel.sub))}</h2>
+    <div class="sub">Tick the students of <b>Group 1</b>; everyone else is <b>Group 2</b>. The groups stay for this class and subject in every month. Then pick “Practical group 1 / 2” above the list for a lecture.</div>
+    <div class="acts" style="flex-wrap:wrap"><button class="btn small" id="pgHalf">First half = Group 1</button><button class="btn small" id="pgOdd">Odd numbers = Group 1</button><button class="btn small" id="pgNone">Untick all</button></div>
+    <div id="pgList" style="max-height:50vh;overflow:auto;margin:6px 0">${act.map((s, i) => `<label style="display:flex;gap:8px;align-items:center;padding:4px 2px;border-bottom:1px solid #eee"><input type="checkbox" data-pg="${esc(s.roll)}" ${cur.has(s.roll) ? 'checked' : ''}> <span>${i + 1}. ${esc(s.name)} <small style="color:#7c6159">${esc(s.roll)}</small></span></label>`).join('')}</div>
+    <div class="sub" id="pgCnt"></div>
+    <div class="acts"><button class="btn small fill grow" id="pgSave">Save groups</button>${g ? '<button class="btn small danger grow" id="pgDel">Remove groups</button>' : ''}<button class="btn small grow" id="pgCancel">Cancel</button></div>`;
+  const boxes = () => [...document.querySelectorAll('#pgList input[data-pg]')];
+  const cnt = () => { const n = boxes().filter(b => b.checked).length; $('#pgCnt').textContent = 'Group 1: ' + n + ' · Group 2: ' + (act.length - n); };
+  $('#pgList').onchange = cnt; cnt();
+  $('#pgHalf').onclick = () => { boxes().forEach((b, i) => b.checked = i < Math.ceil(act.length / 2)); cnt(); };
+  $('#pgOdd').onclick = () => { boxes().forEach((b, i) => b.checked = i % 2 === 0); cnt(); };
+  $('#pgNone').onclick = () => { boxes().forEach(b => b.checked = false); cnt(); };
+  $('#pgCancel').onclick = () => { dlg.close(); renderMain(); };
+  $('#pgSave').onclick = () => { const G1 = boxes().filter(b => b.checked).map(b => b.dataset.pg); if(!G1.length || G1.length === act.length) return toast('Each group needs at least one student.');
+    pgroups[pgKey()] = { G1, at:Date.now() }; store.set('pgroups', pgroups); dlg.close(); renderMain(); toast('Groups saved: ' + G1.length + ' + ' + (act.length - G1.length) + '. Pick the group above the list for each practical lecture.'); };
+  if($('#pgDel')) $('#pgDel').onclick = () => { if(!confirm('Remove the practical groups of this class and subject?')) return; delete pgroups[pgKey()]; store.set('pgroups', pgroups); dlg.close(); renderMain(); };
+  dlg.showModal();
+}
+
 /** Counts only ACTIVE students: disabled students (s.off, changed subject / guest removed) are ignored. */
 function counts(){
-  const d = data[sheetName()]; let p = 0, a = 0, l = 0, b = 0, n = 0;
-  (d ? d.students : []).forEach(s => { if(s.off) return; const v = draft[s.roll]; if(v === 'P') p++; else if(v === 'A') a++; else if(v === 'L') l++; else if(v === 'B') b++; else n++; });
+  const d = data[sheetName()], O = pgOut(d); let p = 0, a = 0, l = 0, b = 0, n = 0;
+  (d ? d.students : []).forEach(s => { if(isOut(s, O)) return; const v = draft[s.roll]; if(v === 'P') p++; else if(v === 'A') a++; else if(v === 'L') l++; else if(v === 'B') b++; else n++; });
   return { p, a, l, b, n, total: p + a + l + b + n };
 }
 
@@ -1453,7 +1505,9 @@ function stats(){
       if(any) lect++;
     });
   });
-  Object.keys(per).forEach(r => { const c = per[r]; c.den = c.g ? c.p + c.a : lect; });
+  // v8.57 a lecture is held for a student only when she is marked in it (practical groups: the free group is not marked;
+  // whole-class lectures always mark every active student, so for them this is the same as before)
+  Object.keys(per).forEach(r => { const c = per[r]; c.den = c.g ? c.p + c.a : Math.min(lect, c.p + c.a + c.l + c.b); });
   return { lect, per };
 }
 const pctOf = (c, l) => { const den = c && c.den != null ? c.den : l; return den ? Math.round(c.p / den * 1000) / 10 : null; };
@@ -1536,12 +1590,13 @@ function mtFillA(){
 }
 /* ---------- main screen ---------- */
 function attBodyHtml(d){
-  return `<div class="allrow"><span class="lbl">Mark all</span><span class="seg">` +
+  const O = pgOut(d), og = pgCur(d) === 'G1' ? 'Group 2' : 'Group 1';
+  return pgBar(d) + `<div class="allrow"><span class="lbl">Mark all</span><span class="seg">` +
     MARKS.map(v => `<label class="ck ${v.toLowerCase()}">${v}<input type="checkbox" data-all="${v}" aria-label="Mark all ${v}"></label>`).join('') + `</span></div>` +
     '<ul class="list" id="list">' + d.students.map((s, i) => `
-    <li class="row ${s.off ? 'off' : ''}" data-roll="${esc(s.roll)}"><span class="no">${i + 1}</span>
-      <span class="who"><b>${esc(s.name)}</b><small><span>${esc(s.roll)}</span><span class="pct"></span>${s.off ? offTag(s) : ''}${tagHtml(s.roll)}</small></span>
-      <span class="seg">${MARKS.map(v => `<button class="${v.toLowerCase()}" data-v="${v}" aria-label="${v}" aria-pressed="false" ${s.off ? 'disabled' : ''}>${v}</button>`).join('')}</span></li>`).join('') + '</ul>';
+    <li class="row ${isOut(s, O) ? 'off' : ''}" data-roll="${esc(s.roll)}"><span class="no">${i + 1}</span>
+      <span class="who"><b>${esc(s.name)}</b><small><span>${esc(s.roll)}</span><span class="pct"></span>${s.off ? offTag(s) : O.has(s.roll) ? '<span class="rtag">' + og + ' · free this lecture</span>' : ''}${tagHtml(s.roll)}</small></span>
+      <span class="seg">${MARKS.map(v => `<button class="${v.toLowerCase()}" data-v="${v}" aria-label="${v}" aria-pressed="false" ${isOut(s, O) ? 'disabled' : ''}>${v}</button>`).join('')}</span></li>`).join('') + '</ul>';
 }
 function mtBodyHtml(d){
   return '<ul class="list" id="mtList">' + d.students.map((s, i) => `
@@ -1677,7 +1732,7 @@ function updateTally(){
   const bar = $('#bar3'), nums = $('#nums'); if(!bar) return;
   bar.innerHTML = ['p','a','l','b'].map(k => `<i class="${k}" style="width:${c[k] / t * 100}%"></i>`).join('');
   nums.innerHTML = `<span class="p"><b>${c.p}</b>P</span><span class="a"><b>${c.a}</b>A</span><span class="l"><b>${c.l}</b>L</span><span class="b"><b>${c.b}</b>B</span><span><b>${c.n}</b>left</span>`;
-  document.querySelectorAll('input[data-all]').forEach(cb => { const act = d ? d.students.filter(s => !s.off) : []; cb.checked = act.length > 0 && act.every(s => draft[s.roll] === cb.dataset.all); });
+  document.querySelectorAll('input[data-all]').forEach(cb => { const O = pgOut(d), act = d ? d.students.filter(s => !isOut(s, O)) : []; cb.checked = act.length > 0 && act.every(s => draft[s.roll] === cb.dataset.all); });
   const sb = $('#saveBtn'); if(sb){ sb.textContent = (hasMulti() ? 'Save lecture ' + sel.period : 'Save attendance') + (c.n ? ' (' + c.n + ' left)' : ''); sb.classList.toggle('incomplete', c.n > 0); }
   const mc = $('#miniCnt'); if(mc) mc.textContent = 'P ' + c.p + ' \u00b7 A ' + c.a + (c.n ? ' \u00b7 ' + c.n + ' left' : '');
   paintPct(); paintFilters();
@@ -1693,7 +1748,8 @@ function save(){
   const name = sheetName(), d = data[name]; if(!d) return toast('This sheet is not on the phone yet');
   const c = counts(); if(c.n > 0) return toast(c.n + ' student' + (c.n > 1 ? 's are' : ' is') + ' not marked. Mark everyone P, A, L or B first.');
   const srv = ((d.marks && d.marks[sel.day]) || {})[sel.period] || {}, marks = {};
-  d.students.forEach(s => { if(s.off) return; const v = draft[s.roll]; if(MARKS.includes(v)) marks[s.roll] = v; else if(srv[s.roll]) marks[s.roll] = ''; });
+  const O = pgOut(d);   // v8.57 practical group: the other group's marks of this lecture are cleared, never required
+  d.students.forEach(s => { if(s.off) return; if(O.has(s.roll)){ if(srv[s.roll]) marks[s.roll] = ''; return; } const v = draft[s.roll]; if(MARKS.includes(v)) marks[s.roll] = v; else if(srv[s.roll]) marks[s.roll] = ''; });
   if(!Object.keys(marks).length) return toast('No students to save');
   enqueue(marks); dirty = false; { const i = recInfo({ sheet:name, day:sel.day, period:sel.period, marks }); toast(i.who + ' \u00b7 ' + i.what + ' saved on phone.', { label:'Share absentees', fn:shareAbsentees, ms:9000 }); } renderMain();
   syncQueue().then(ok => { if(!ok && queue.length) toast('Saved on this phone. Tap the status chip to see why it has not reached the sheet.'); });
@@ -1985,13 +2041,21 @@ if(t.closest('#multiOff')){ delete multi[multiKey()]; store.set('multi2', multi)
 });
 document.addEventListener('change', ev => {
   const t = ev.target, id = t && t.id, v = t && t.value;
+  if(id === 'pgSel'){
+    if(v === 'set') return openGroups();
+    const d = data[sheetName()], O0 = new Set(), def = pgDef(d);
+    if(v && def) def[v === 'G1' ? 'G2' : 'G1'].forEach(r => O0.add(r));
+    pglec[pgLecKey()] = v; store.set('pglec', pglec);
+    O0.forEach(r => { if(draft[r]) { delete draft[r]; dirty = true; } });   // the free group is never marked in this lecture
+    renderMain(); return;
+  }
   if(id === 'selCls') switchTo(() => choose('cls', v));
   else if(id === 'selSub') switchTo(() => choose('sub', v));
   else if(id === 'selMon') switchTo(() => choose('mon', v));
   else if(t && t.dataset && t.dataset.all){
     const d = data[sheetName()]; if(!d) return;
     const val = t.dataset.all, snap = Object.assign({}, draft), was = dirty;
-    d.students.forEach(s => { if(s.off) return; if(t.checked) draft[s.roll] = val; else if(draft[s.roll] === val) delete draft[s.roll]; });
+    const O = pgOut(d); d.students.forEach(s => { if(isOut(s, O)) return; if(t.checked) draft[s.roll] = val; else if(draft[s.roll] === val) delete draft[s.roll]; });
     dirty = true; document.querySelectorAll('#list .row').forEach(paintRow); updateTally();
     toast(t.checked ? 'Marked all ' + val : 'Cleared all ' + val, { label:'Undo', fn:() => { draft = snap; dirty = was; document.querySelectorAll('#list .row').forEach(paintRow); updateTally(); toast('Undone'); } });
   }
@@ -2684,7 +2748,7 @@ window.openHelp = openHelp;
 /* ---------- settings ---------- */
 const COLLEGE     = 'JINNAH COLLEGE FOR WOMEN';
 const COLLEGE_SUB = 'University of Peshawar';
-const SYSTEM      = 'JCW Daily Attendance';
+const SYSTEM      = 'JCMS · Jinnah College Management System';
 const LIBS = [
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'
@@ -3548,7 +3612,7 @@ function renderHome(){
   let nowX = null, nextX = null;
   items.forEach(x => { const r = planRange(x.plan); if(!r) return; if(r.s <= nowM && nowM < r.e) nowX = x; else if(r.s > nowM && !nextX && !x.done) nextX = x; });
 
-  let h = header('JCW Daily Attendance', greet() + ', ' + (teacher || user) + (isAdmin ? ' (admin)' : '')) + '<main class="wrap2"><div class="grid2">';
+  let h = header('JCMS', greet() + ', ' + (teacher || user) + (isAdmin ? ' (admin)' : '')) + '<main class="wrap2"><div class="grid2">';
   const college = scope ? collegeCard() : '';
   if(college && !cur.length) h += college;
   if(isTTM) h += ttmCard();
@@ -7118,7 +7182,7 @@ window.renderMain = function(){
     try{ appView === 'admin' ? renderAdmin() : appView === 'profile' ? renderProfile() : appView === 'reports' ? renderReports() : appView === 'mytt' ? renderMyTT() : appView === 'free' ? renderFree() : appView === 'contacts' ? renderContacts() : appView === 'search' ? renderSearch() : renderHome(); }
     catch(err){
       console.error(err);
-      app.innerHTML = header('JCW Daily Attendance', '') + `<main class="wrap2"><div class="err2">This screen could not be shown: ${esc(err.message || err)}</div><button class="btn primary" data-view="att">Open attendance</button></main>`;
+      app.innerHTML = header('JCMS', '') + `<main class="wrap2"><div class="err2">This screen could not be shown: ${esc(err.message || err)}</div><button class="btn primary" data-view="att">Open attendance</button></main>`;
     }
     if(enter){ lastView = appView; app.classList.add('view-enter'); setTimeout(() => app.classList.remove('view-enter'), 700); window.scrollTo(0, 0); }
     else window.scrollTo(0, sy);
@@ -7417,7 +7481,7 @@ document.addEventListener('change', ev => {
   if(!t || !t.dataset || !t.dataset.all || !t.checked || t.dataset.all === 'L') return;
   const d = data[sheetName()]; if(!d) return;
   const lv = leavesOn(sel.day); let n = 0;
-  d.students.forEach(s => { if(!s.off && lv[s.roll] && draft[s.roll] === t.dataset.all){ draft[s.roll] = 'L'; n++; } });
+  const O = pgOut(d); d.students.forEach(s => { if(!isOut(s, O) && lv[s.roll] && draft[s.roll] === t.dataset.all){ draft[s.roll] = 'L'; n++; } });
   if(n){ document.querySelectorAll('#list .row').forEach(paintRow); updateTally(); }
 });
 
