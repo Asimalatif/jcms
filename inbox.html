@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JCMS · Instant save monitor</title>
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--br:#6B3423;--bg:#FBF3F1;--line:#E7B7AE;--soft:#FBEDEA;--tx:#2a1a14;--mu:#7c6159}
+*{box-sizing:border-box}body{margin:0;font:14.5px/1.5 system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:linear-gradient(90deg,#5a2a1b,#8a4a32);color:#fff;padding:12px 18px;display:flex;align-items:center;gap:12px}
+header h1{font-size:18px;margin:0}header small{display:block;font-size:12.5px;opacity:.85;font-weight:400}
+header a{margin-left:auto;color:#fff;border:1.5px solid #fff;border-radius:999px;padding:5px 12px;text-decoration:none;font-weight:700;font-size:13px}
+main{max-width:1150px;margin:0 auto;padding:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:0 0 12px}
+h2{font-size:16px;margin:0 0 6px;color:var(--br)}.sub{color:var(--mu);font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:6px 0}
+.tile{background:var(--soft);border-radius:12px;padding:8px 10px}.tile b{display:block;font-size:22px}.tile span{font-size:12.5px;color:var(--mu)}
+button{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--soft);color:var(--br);border-radius:10px;padding:7px 12px;cursor:pointer;margin:2px 4px 2px 0}
+button.p{background:var(--br);color:#fff;border-color:var(--br)}button.on{background:var(--br);color:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:5px 6px;border-bottom:1px solid #f1dcd7;vertical-align:top}th{background:var(--soft);position:sticky;top:0}
+.ok{color:#1b5e20;font-weight:700}.warn{color:#a35a00;font-weight:700}.bad{color:#b00020;font-weight:700}
+.wrap{max-height:520px;overflow:auto;border:1px solid #f1dcd7;border-radius:10px}
+input{font:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:220px}
+</style></head><body>
+<header><div><h1>Instant save monitor<small>JCMS · attendance saves waiting in the inbox and written to the sheets</small></h1></div><a href="./">Open the app</a></header>
+<main>
+<section class="card"><h2>Status</h2>
+<div id="st" class="sub">Loading…</div>
+<div class="tiles" id="tiles"></div>
+<div><button class="p" id="bR">Refresh now</button><label class="sub"><input type="checkbox" id="auto" checked style="min-width:0"> refresh every 20 s</label>
+ · Show: <button id="sReal" class="on">Teachers (real sheets)</button><button id="sTest">Load test copy</button>
+ · Instant save for teachers: <button id="bOn">Switch ON</button><button id="bOff">Switch OFF</button></div>
+<div class="sub" style="margin-top:6px"><b>How it works:</b> when instant save is ON, a teacher's attendance save goes into the inbox and she gets “saved” at once. Every minute the writer job copies the inbox into the month workbook, one section at a time. <b>Waiting</b> = in the inbox, not yet in the sheet (the teacher already sees her marks in the app). <b>Written</b> = now in the sheet. <b>Problems</b> = could not be written after 3 tries (kept here so nothing is lost; enter them by hand). When it is OFF, saves go straight to the sheets as before and nothing waits here.</div>
+</section>
+<section class="card"><div><button id="tW" class="on">Waiting</button><button id="tD">Written (last 6 hours)</button><button id="tP">Problems</button>
+<input id="q" placeholder="Search teacher, section, day…"></div>
+<div class="wrap" style="margin-top:8px"><div id="out" class="sub" style="padding:8px">…</div></div></section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const ls = { get:(k, d) => { try{ const v = localStorage.getItem('csa2_' + k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } } };
+const API = 'https://script.google.com/macros/s/AKfycbzl-DwgASIhf-pIGYi9D3M-CGOm7d7-UKg0W-OoWAiuRBHe4mjlRgMQXIHuLm6zi--i/exec';
+const user = ls.get('user', ''), pass = ls.get('pass', '');
+const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+async function api(p){ try{ const r = await fetch(API, { method:'POST', body:JSON.stringify(Object.assign({ username:user, password:pass }, p)) }); return JSON.parse(await r.text()); }catch(e){ return { ok:false, error:'No connection: ' + e.message }; } }
+let D = null, tab = 'W', scope = 'real';
+const ago = (ms, now) => { const s = Math.max(0, Math.round((now - ms) / 1000)); return s < 60 ? s + ' s' : s < 3600 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : Math.floor(s / 3600) + ' h ' + Math.floor(s % 3600 / 60) + ' min'; };
+const tm = ms => new Date(ms).toLocaleTimeString('en-GB');
+const cnt = n => `P ${n.p} · A ${n.a}${n.l ? ' · L ' + n.l : ''}${n.b ? ' · B ' + n.b : ''}${n.blank ? ' · cleared ' + n.blank : ''}`;
+async function load(set){
+  if(!user){ $('#st').innerHTML = '<span class="bad">Sign in to the app with the admin login first (same browser), then reload.</span>'; return; }
+  const r = await api(Object.assign({ action:'inbox_admin', detail:true }, scope === 'test' ? { test:true } : {}, set ? { set } : {}));
+  if(!r.ok){ $('#st').innerHTML = '<span class="bad">' + esc(r.error) + '</span>'; return; }
+  D = r; draw();
+}
+function draw(){
+  const r = D, now = r.now, old = r.list.filter(x => now - x.put > 180000).length, run = r.run;
+  $('#st').innerHTML = (scope === 'test' ? '<b>Load test copy</b> · ' : '<b>Teachers (real sheets)</b> · ') + 'Instant save for teachers: ' + (r.on ? '<span class="ok">ON</span>' : '<span class="warn">OFF</span> (saves go straight to the sheets)') +
+    ' · writer job: ' + (r.triggers ? '<span class="ok">set up</span>' : '<span class="warn">not set up yet (it is made with the first inbox save)</span>') + (r.running ? ' · <b>writing now</b>' : '') + ' · updated ' + tm(now);
+  $('#tiles').innerHTML = [
+    ['Waiting in the inbox', r.waiting, r.waiting ? (old ? 'bad' : 'warn') : 'ok'],
+    ['Waiting more than 3 min', old, old ? 'bad' : 'ok'],
+    ['Oldest waiting', r.list.length ? ago(Math.min(...r.list.map(x => x.put)), now) : '-', ''],
+    ['Written (last 6 h)', r.done.length, 'ok'],
+    ['Problems', r.problems.filter(p => scope === 'test' ? p.test : !p.test).length, r.problems.length ? 'bad' : 'ok'],
+    ['Last writer run', run ? tm(run.start) + ' · ' + run.done + '/' + run.groups + ' sections, ' + run.recs + ' saves, ' + Math.round((run.ms || 0) / 1000) + ' s' + (run.errors ? ' · ' + run.errors + ' error(s)' : '') : 'no run yet', run && run.errors ? 'bad' : '']
+  ].map(([t, v, c]) => `<div class="tile"><span>${t}</span><b class="${c}" style="${String(v).length > 12 ? 'font-size:13px' : ''}">${esc(v)}</b></div>`).join('');
+  const q = $('#q').value.trim().toLowerCase(), hit = o => !q || JSON.stringify(o).toLowerCase().includes(q);
+  let h = '';
+  if(tab === 'W'){
+    const L = r.list.filter(hit);
+    h = L.length ? '<table><tr><th>#</th><th>Teacher</th><th>Section · subject (sheet)</th><th>Month</th><th>Day</th><th>Lecture</th><th>Marks</th><th>Saved at</th><th>Waiting</th><th>Tries / last problem</th></tr>' +
+      L.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.who)}</td><td>${esc(x.sheet)}</td><td>${esc(x.mon || '')}</td><td>${x.day}</td><td>${x.per}</td><td>${cnt(x.n)}</td><td>${tm(x.put)}</td><td class="${now - x.put > 180000 ? 'bad' : ''}">${ago(x.put, now)}</td><td>${x.tries ? '<span class="bad">' + x.tries + ' · ' + esc(x.err) + '</span>' : ''}</td></tr>`).join('') + '</table>'
+      : '<div style="padding:8px" class="ok">Nothing waiting: every save is in the sheets.</div>';
+  } else if(tab === 'D'){
+    const L = r.done.filter(hit);
+    h = L.length ? '<table><tr><th>#</th><th>Written at</th><th>Teacher</th><th>Section · subject (sheet)</th><th>Day</th><th>Lecture</th><th>Marks</th><th>Saved at</th><th>Waited</th></tr>' +
+      L.map((x, i) => `<tr><td>${i + 1}</td><td>${tm(x.at)}</td><td>${esc(x.who)}</td><td>${esc(x.sheet)}</td><td>${x.day}</td><td>${x.per}</td><td>${cnt(x.n)}</td><td>${tm(x.put)}</td><td>${ago(x.put, x.at)}${x.tries ? ' (' + x.tries + ' retries)' : ''}</td></tr>`).join('') + '</table>'
+      : '<div style="padding:8px">Nothing written in the last 6 hours.</div>';
+  } else {
+    const L = r.problems.filter(p => (scope === 'test' ? p.test : !p.test) && hit(p));
+    h = L.length ? '<div class="sub" style="padding:6px">These saves could not be written after 3 tries. They are also in the sheet “Inbox problems” (Users workbook). Enter the marks by hand or ask the teacher to save again.</div><table><tr><th>Time</th><th>Teacher</th><th>Sheet</th><th>Day</th><th>Lecture</th><th>Problem</th><th>Marks</th></tr>' +
+      L.map(p => `<tr><td>${typeof p.at === 'number' ? new Date(p.at).toLocaleString('en-GB') : esc(p.at)}</td><td>${esc(p.who)}</td><td>${esc(p.sheet)}</td><td>${esc(p.day)}</td><td>${esc(p.per)}</td><td class="bad">${esc(p.why)}</td><td style="font-size:11.5px">${esc(String(p.marks).slice(0, 300))}</td></tr>`).join('') + '</table>'
+      : '<div style="padding:8px" class="ok">No problems.</div>';
+  }
+  $('#out').innerHTML = h;
+}
+const setTab = t => { tab = t; ['W', 'D', 'P'].forEach(k => $('#t' + k).classList.toggle('on', k === t)); draw(); };
+$('#tW').onclick = () => setTab('W'); $('#tD').onclick = () => setTab('D'); $('#tP').onclick = () => setTab('P');
+$('#q').oninput = () => D && draw();
+$('#bR').onclick = () => load();
+$('#sReal').onclick = () => { scope = 'real'; $('#sReal').classList.add('on'); $('#sTest').classList.remove('on'); load(); };
+$('#sTest').onclick = () => { scope = 'test'; $('#sTest').classList.add('on'); $('#sReal').classList.remove('on'); load(); };
+$('#bOn').onclick = () => { if(confirm('Switch ON instant save for every teacher? Their attendance saves are answered at once and reach the sheets within a minute or two.')) load('on'); };
+$('#bOff').onclick = () => { if(confirm('Switch OFF? Saves go straight to the sheets again (what is already waiting is still written by the job).')) load('off'); };
+setInterval(() => { if($('#auto').checked && !document.hidden) load(); }, 20000);
+load();
+</script></body></html>

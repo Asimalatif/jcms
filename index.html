@@ -996,7 +996,7 @@ function savedLines(batch, res){
     const { who, what } = recInfo(b), c = res.confirmed && res.confirmed[id]; let d = '';
     if(b.kind === 'mt') d = c && c.total ? ' (out of ' + c.total + ')' : '';
     else if(c && c.p != null) d = ' (P ' + c.p + ', A ' + c.a + (c.l ? ', L ' + c.l : '') + (c.b ? ', B ' + c.b : '') + ')';
-    return '\u2713 ' + who + ' \u00b7 ' + what + ' reached the sheet' + d;
+    return '\u2713 ' + who + ' \u00b7 ' + what + (c && c.queued ? ' saved (reaches the sheet within a minute or two)' : ' reached the sheet') + d;
   }).filter(Boolean);
 }
 const joinLines = l => l.slice(0, 4).join('\n') + (l.length > 4 ? '\n+' + (l.length - 4) + ' more' : '');
@@ -6309,7 +6309,9 @@ function adminExtraCards(){
       <div class="sub">One-tap backup of every workbook of the software into a dated Drive folder (<i>JCW session 2026-27 complete backup …</i>), open or restore earlier backups (password + typed confirmation), and get everything ready for a new session: backup, 2nd Year out, 1st Year becomes 2nd Year, sheets emptied.</div>
       <div class="acts2"><a class="btn primary" href="system.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open Backups &amp; new session</a></div></section><section class="card"><h3>${I.doc} Logins &amp; services</h3>
       <div class="sub">Add a new login (e.g. a computer assistant) or change one in the Users sheet: name, username, password, role, department. Switch services on or off for each login (admissions, ID / chest cards, certificates, duty lists, reports …) and switch a login off.</div>
-      <div class="acts2"><a class="btn primary" href="users.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open Logins &amp; services</a></div></section><section class="card"><h3>${I.doc} Portal scripts (Tampermonkey)</h3>
+      <div class="acts2"><a class="btn primary" href="users.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open Logins &amp; services</a></div></section><section class="card"><h3>${I.doc} Instant save monitor</h3>
+      <div class="sub">Attendance saves waiting in the inbox and the ones already written to the sheets (teacher, section, day, lecture, marks, how long they waited), problems, and the ON / OFF switch for instant save.</div>
+      <div class="acts2"><a class="btn primary" href="inbox.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open the monitor</a></div></section><section class="card"><h3>${I.doc} Portal scripts (Tampermonkey)</h3>
       <div class="sub">Every script for the UOP portal in one place, to install again on a new laptop: JCW Portal Sync, New Session List, Enrollment Manager, and the Admission Quota Manager's Lookup Bridge and Status Check, with what each one does and the steps for a new laptop.</div>
       <div class="acts2"><a class="btn primary" href="scripts.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Open Portal scripts</a></div></section><section class="card"><h3>${I.check} System health check</h3>
       <div class="sub">Finds problems before they stop the work: duplicate roll numbers, students without subjects or class, timetable teachers without a login, classes with no students, sections with no attendance this month, missing sheets and automatic jobs that are off.</div>
