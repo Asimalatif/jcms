@@ -18,6 +18,7 @@ th{background:#FCEFEB;position:sticky;top:0}.n{text-align:right}
 .bad{color:#B42318;font-weight:600}.ok{color:#0E7A4F;font-weight:600}.warn{color:#9A5B00;font-weight:600}
 #log{max-height:240px;overflow:auto;font:12px Consolas,monospace;background:#FAF6F5;border:1px solid #eee;border-radius:8px;padding:6px;white-space:pre-wrap}
 .bar{height:10px;background:#F3E2DC;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:#6B3423;width:0}
+button.on{background:var(--br,#6B3423);color:#fff}
 </style></head><body><main>
 <h1>Load test: 7 days of fake attendance</h1>
 <div class="sub">Every teacher of the timetable "marks" every period of the days you choose, with random P / A / L, the way the app does it (one save per period). <b>All marks go into a COPY of the month workbook</b>: the real attendance sheets, the Attendance Index and the change history are never written. Admin login only. Run it in the evening, when real teachers are not marking.</div>
@@ -45,6 +46,12 @@ Working days <input id="nd" type="number" min="1" max="14" value="7" style="widt
 <div class="sub">Saves of attendance marks go into a small inbox and are answered at once; every minute the server writes the inbox into the month workbook. The load test always uses the inbox (on the copy). <b>Teachers</b> use it only when you switch it on here.</div>
 <div class="sub">Full details (every waiting and written save): <a href="inbox.html" target="_blank">Instant save monitor</a> → Load test copy.</div><div class="row"><button id="bInT">How many wait for the copy?</button><span id="inT" class="sub"></span></div>
 <div class="row"><b>For teachers (real sheets):</b> <span id="inR" class="sub">…</span><button id="bInOn">Switch ON</button><button id="bInOff">Switch OFF</button></div>
+</section>
+<section class="card"><h2>4 · Preview: what you will see (from the copy)</h2>
+<div class="sub">The same lists as in the app, made from the test copy: <b>College → Today</b> (who has and has not marked a day) and <b>Marked-Missed Entries</b> for the month. The marks the test saved reach these lists about a minute after they are written into the copy.</div>
+<div class="row">Day <input id="pvDay" type="number" min="1" max="31" value="17" style="width:70px"><button class="p" id="bPv">Show the day</button>
+<button id="pvNm" class="on">Not marked</button><button id="pvAll">All teachers</button><button id="pvMon">Month: Marked-Missed</button><label class="sub"><input type="checkbox" id="pvOnly" checked> only unmarked rows (month)</label></div>
+<div id="pvOut" class="sub" style="margin-top:8px">Press “Show the day”.</div>
 </section>
 <section class="card"><h2>3 · Results</h2>
 <div class="k" id="kpi"></div>
@@ -76,6 +83,35 @@ const inReal = async set => { const r = await api(Object.assign({ action:'inbox_
 $('#bInOn').onclick = () => { if(confirm('Switch ON instant save for every teacher? Their attendance saves are answered at once and reach the sheets within about a minute.')) inReal('on'); };
 $('#bInOff').onclick = () => inReal('off');
 if(user) inReal();
+let PV = null, pvMode = 'nm';
+const pvTitle = s => String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+function pvDraw(){
+  const out = $('#pvOut'); if(!PV) return;
+  if(!PV.ok){ out.innerHTML = '<span class="bad">' + esc(PV.error) + '</span>'; return; }
+  const day = PV.day, d = new Date(PV.y, PV.m, day), ds = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  ['pvNm', 'pvAll', 'pvMon'].forEach(k => $('#' + k).classList.toggle('on', ({ pvNm:'nm', pvAll:'all', pvMon:'mon' })[k] === pvMode));
+  if(pvMode === 'mon'){
+    const R = PV.rows.filter(r => !$('#pvOnly').checked || !r.marked).sort((a, b) => a.cls.localeCompare(b.cls) || a.sub.localeCompare(b.sub));
+    out.innerHTML = '<b>Marked-Missed Entries · attendance of the month (copy)</b> · ' + PV.rows.filter(r => r.marked).length + ' of ' + PV.rows.length + ' section-subjects have attendance this month.' +
+      '<table><tr><th>Section</th><th>Subject</th><th>Teacher</th><th>Days marked</th><th>Last day</th><th>Attendance</th></tr>' +
+      R.map(r => `<tr><td>${esc(r.cls)}</td><td>${esc(pvTitle(r.sub))}</td><td>${esc(r.teacher)}</td><td class="n">${r.marked}</td><td class="n">${r.last || '-'}</td><td>${r.marked ? '<span class="ok">✔ marked</span>' : '<span class="bad">✖ not marked</span>'}</td></tr>`).join('') + '</table>';
+    return;
+  }
+  if(PV.sunday){ out.innerHTML = ds + ' is a Sunday: nothing is due.'; return; }
+  const sched = PV.rows.filter(r => r.sched !== false), T = {};
+  sched.forEach(r => { const k = r.teacher || '(no teacher)'; (T[k] = T[k] || { name:k, dept:r.dept, rows:[] }).rows.push(r); });
+  const L = Object.values(T).map(t => Object.assign(t, { done:t.rows.filter(r => r.today).length })).filter(t => pvMode === 'all' || t.done < t.rows.length)
+    .sort((a, b) => (b.rows.length - b.done) - (a.rows.length - a.done) || a.name.localeCompare(b.name));
+  const pend = Object.values(T).filter(t => t.done < t.rows.length).length;
+  out.innerHTML = '<b>College → Today · ' + esc(ds) + '</b> · ' + pend + ' of ' + Object.keys(T).length + ' teachers have something not marked (only classes in that day\'s timetable).' +
+    '<table><tr><th>Teacher</th><th>Department</th><th>Marked</th><th>Classes (✓ = marked)</th><th>Remind (WhatsApp message)</th></tr>' +
+    L.map(t => { const left = t.rows.filter(r => !r.today).map(r => r.cls + ' ' + pvTitle(r.sub));
+      const msg = 'Assalam-o-Alaikum ' + t.name + ',\nToday\'s attendance (' + ds + ') is not marked yet' + (left.length ? ' for:\n- ' + left.join('\n- ') : '.') + '\nPlease mark it in JCMS (the JCW app).';
+      return `<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.dept || '')}</td><td class="n ${t.done === t.rows.length ? 'ok' : 'bad'}">${t.done}/${t.rows.length}</td><td>${t.rows.map(r => (r.today ? '<span class="ok">✓ ' : '<span class="bad">') + esc(r.cls + ' · ' + pvTitle(r.sub)) + '</span>').join('<br>')}</td><td>${left.length ? '<details><summary>Remind</summary><pre style="white-space:pre-wrap;margin:4px 0">' + esc(msg) + '</pre></details>' : ''}</td></tr>`; }).join('') + '</table>' +
+    (L.length ? '' : '<div class="ok">Every teacher has marked this day.</div>');
+}
+$('#bPv').onclick = async () => { $('#pvOut').textContent = 'Reading the copy…'; PV = await api({ action:'overview', test:true, day:Number($('#pvDay').value) || 1 }); pvDraw(); };
+$('#pvNm').onclick = () => { pvMode = 'nm'; pvDraw(); }; $('#pvAll').onclick = () => { pvMode = 'all'; pvDraw(); }; $('#pvMon').onclick = () => { pvMode = 'mon'; pvDraw(); }; $('#pvOnly').onchange = pvDraw;
 $('#bSet').onclick = async () => { const r = await api({ action:'test_setup', mon:$('#mon').value, id:$('#cid').value.trim() }, 60000);
   $('#setMsg').innerHTML = r.ok ? (r.off ? 'Test switched off.' : '<span class="ok">✓ Using the copy "' + esc(r.name) + '" for ' + esc(r.mon) + '.</span> Real workbooks stay untouched.') : '<span class="bad">' + esc(r.error) + '</span>'; };
 $('#bOff').onclick = async () => { const r = await api({ action:'test_setup', mon:$('#mon').value, id:'' }, 60000); $('#setMsg').textContent = r.ok ? 'Test switched off: the server no longer knows the copy.' : r.error; };
